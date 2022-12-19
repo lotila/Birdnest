@@ -18,12 +18,17 @@ app.engine('hbs',engines.handlebars);
 app.set('views','./views');
 app.set('view engine','hbs');
 
+// available on the local host 
 
 var serviceAccount = require("../../dronetracking.json");
 admin.initializeApp({
 credential: admin.credential.cert(serviceAccount),
 });
 
+// available on the web
+//admin.initializeApp(functions.config().firebase);
+
+// write dynamic title
 async function getFirestore(){
     const firestore_con  = await admin.firestore();
     const writeResult = firestore_con.collection('sample').doc('sample_doc').get().then(doc => {
