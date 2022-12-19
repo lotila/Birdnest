@@ -1,5 +1,12 @@
 <html>
-    <body>
-      <h1>{{db_result.Heading}}</h1>
-    </body>
+  <body>
+    <fieldset>
+      <legend>Drone fly zone violations</legend>
+        <ul>
+          {{#each drone_pilot}}
+          <li>{{this}}</li>
+          {{/each}}
+        </ul>
+    </fieldset>
+  </body>
 </html>

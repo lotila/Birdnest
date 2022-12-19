@@ -13,13 +13,13 @@ const engines = require('consolidate');
 var hbs = require('handlebars');
 const admin = require('firebase-admin');
 
+// front end is in views folder
 const app = express();
 app.engine('hbs',engines.handlebars);
 app.set('views','./views');
 app.set('view engine','hbs');
 
 // available on the local host 
-
 var serviceAccount = require("../../dronetracking.json");
 admin.initializeApp({
 credential: admin.credential.cert(serviceAccount),
@@ -28,19 +28,13 @@ credential: admin.credential.cert(serviceAccount),
 // available on the web
 //admin.initializeApp(functions.config().firebase);
 
-// write dynamic title
-async function getFirestore(){
-    const firestore_con  = await admin.firestore();
-    const writeResult = firestore_con.collection('sample').doc('sample_doc').get().then(doc => {
-    if (!doc.exists) { console.log('No such document!'); }
-    else {return doc.data();}})
-    .catch(err => { console.log('Error getting document', err);});
-    return writeResult
-    }
-
 
 app.get('/',async (request,response) =>{
-var db_result = await getFirestore();
-response.render('index',{db_result});
+    response.render('index',{dronePilot:[
+        "drone pilot 1", 
+        "drone pilot 2"
+    ]});
 });
+
+
 exports.app = functions.https.onRequest(app);
