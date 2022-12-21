@@ -23,28 +23,27 @@ credential: admin.credential.cert(serviceAccount),
 // available on the web
 //admin.initializeApp(functions.config().firebase);
 
-var droneData = "fetchData.drones();";
-
-var dronePilot = [
-        "drone pilot 2"
-    ];
-
 
 // limit trasfer size
 app.use(express.json({ limit: '1mb' }));
 
+// test data                                                     TODO
+const newPilots = ["Ram", "Shyam", "Sita", "Gita"];
+const oldPilots = ["Ram", "Shyam"];
+const allPilots = ["huh", "Shyam", "Sita", "Gita"];
+
 // initial web request
 app.get('/',async (request,response) =>{
-    response.render('index',{dronePilot});
+    response.render('index',{allPilots});
 });
 
 // update pilot list data
 app.post('/api', (request, response) => {
     response.json({
-        status: 'success'
+    addPilots: newPilots,
+    removePilots: oldPilots
     });
 });
-
 
 // start server
 exports.app = functions.https.onRequest(app);

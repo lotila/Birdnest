@@ -3,26 +3,52 @@
   <body>
     <fieldset>
       <legend>Drone fly zone violations</legend>
-        <ul>
-          {{#each dronePilot}}
-          <li>{{this}}</li>
-          {{/each}}
-        </ul>
+         <ul id="pilotList"></ul>
     </fieldset>
   </body>
   <script>
-    // reguest data from server every 2 seconds
-    function liveUpdate() {
+    // page is fully loaded
+    document.addEventListener('DOMContentLoaded', function () 
+    { 
+      const pilotList = document.getElementById("pilotList");
+      const pilotListElements = pilotList.getElementsByTagName("li");
+      var response;
+      var update;
+      var index;
+      var listItem;
+
+        // initial pilot list
+      {{#each allPilots}}
+        listItem = document.createElement("li");
+        listItem.innerText = '{{this}}';
+        pilotList.appendChild(listItem);
+      {{/each}}
+
+      // reguest data from server every 2 seconds
       setInterval( async function () {
-        const response = await fetch('/api', {
+
+        // request data
+        response = await fetch('/api', {
           method: 'POST'
         });
-        const result = await response.json();
-        console.log(result);
+        update = await response.json();
+
+        // remove old pilots from list
+        update.removePilots.forEach((oldPilot) => {
+          for (index = 0; index < pilotListElements.length; index++) {
+            if ( oldPilot == pilotListElements.item(index).innerHTML) {
+              pilotListElements.item(index).remove();
+            }
+          };
+        });
+
+        // add new pilots to list
+        update.addPilots.forEach((newPilot) => {
+          listItem = document.createElement("li");
+          listItem.innerText = newPilot;
+          pilotList.appendChild(listItem);
+        });
       },2000);
-    };
-    // site is loaded and start live update
-    document.addEventListener('DOMContentLoaded', 
-      function () { liveUpdate(); });
+  });
   </script>
 </html>
