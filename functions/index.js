@@ -32,7 +32,7 @@ const database = admin.firestore().collection('pilot_data');
 // limit trasfer size
 app.use(express.json({ limit: '1mb' }));
 
-
+// get pilot list from the database for client
 async function getPilotList(){
     const snapshot = await database.get();
     var pilotList = [];
@@ -42,9 +42,9 @@ async function getPilotList(){
         + " " + doc.data().email
         + " " + doc.data().phoneNumber
         );});
-        
     return pilotList;
 }
+
 
 // test data                                                     TODO
 const newPilots = ["Ram", "Shyam", "Sita", "Gita"];
@@ -69,6 +69,15 @@ app.post('/api', (request, response) => {
     removePilots: oldPilots
     });
 });
+
+// fetch data every 2 seconds
+var dronePostions;
+dronePostions = fetchData.dronePostions();
+setInterval( function () {
+    
+
+
+}, 2000);
 
 // start server
 exports.app = functions.https.onRequest(app);
