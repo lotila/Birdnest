@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <body>
     <fieldset>
       <legend>Drone fly zone violations</legend>
@@ -9,4 +10,19 @@
         </ul>
     </fieldset>
   </body>
+  <script>
+    // reguest data from server every 2 seconds
+    function liveUpdate() {
+      setInterval( async function () {
+        const response = await fetch('/api', {
+          method: 'POST'
+        });
+        const result = await response.json();
+        console.log(result);
+      },2000);
+    };
+    // site is loaded and start live update
+    document.addEventListener('DOMContentLoaded', 
+      function () { liveUpdate(); });
+  </script>
 </html>

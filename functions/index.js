@@ -15,6 +15,7 @@ app.set('view engine','hbs');
 
 // available on the local host 
 var serviceAccount = require("../../dronetracking.json");
+const { response } = require("express");
 admin.initializeApp({
 credential: admin.credential.cert(serviceAccount),
 });
@@ -24,13 +25,26 @@ credential: admin.credential.cert(serviceAccount),
 
 var droneData = "fetchData.drones();";
 
-
-app.get('/',async (request,response) =>{
-    response.render('index',{dronePilot:[
-        "drone pilot 1", 
+var dronePilot = [
         "drone pilot 2"
-    ]});
+    ];
+
+
+// limit trasfer size
+app.use(express.json({ limit: '1mb' }));
+
+// initial web request
+app.get('/',async (request,response) =>{
+    response.render('index',{dronePilot});
+});
+
+// update pilot list data
+app.post('/api', (request, response) => {
+    response.json({
+        status: 'success'
+    });
 });
 
 
+// start server
 exports.app = functions.https.onRequest(app);
