@@ -1,13 +1,16 @@
 
 const fetchData = require("./fetchData")
 
-const functions = require('firebase-functions');
+
 const express = require('express');
-const engines = require('consolidate');
-var hbs = require('handlebars');
+
+// firebase as web hosting provider and database
+const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
 // front end is in views folder
+const engines = require('consolidate');
+var hbs = require('handlebars');
 const app = express();
 app.engine('hbs',engines.handlebars);
 app.set('views','./views');
@@ -23,17 +26,39 @@ credential: admin.credential.cert(serviceAccount),
 // available on the web
 //admin.initializeApp(functions.config().firebase);
 
+// database
+const database = admin.firestore().collection('pilot_data');
 
 // limit trasfer size
 app.use(express.json({ limit: '1mb' }));
 
+
+async function getPilotList(){
+    const snapshot = await database.get();
+    var pilotList = [];
+    snapshot.forEach(doc => {
+        pilotList.push(doc.data().firstName 
+        + " " + doc.data().lastName
+        + " " + doc.data().email
+        + " " + doc.data().phoneNumber
+        );});
+        
+    return pilotList;
+}
+
 // test data                                                     TODO
 const newPilots = ["Ram", "Shyam", "Sita", "Gita"];
 const oldPilots = ["Ram", "Shyam"];
-const allPilots = ["huh", "Shyam", "Sita", "Gita"];
+const allPilotsTes = {
+    firstName: "huh",
+    lastName: "dsdsds",
+    email: "Sita",
+    phoneNumber: "Gita"
+};
 
 // initial web request
 app.get('/',async (request,response) =>{
+    const allPilots = await getPilotList();
     response.render('index',{allPilots});
 });
 
