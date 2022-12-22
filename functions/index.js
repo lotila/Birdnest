@@ -3,6 +3,11 @@ const fetchData = require("./fetchData")
 const { parseString } = require("xml2js");
 const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
 
+const NESTZONE = {
+    POSX: 250000,
+    POSY: 250000,
+    RADIOUS: 100
+};
 
 const express = require('express');
 
@@ -47,13 +52,17 @@ async function getPilotList(){
     return pilotList;
 }
 
+// check for fly zone violation
+function isFlyZoneViolation(dronePosX, dronePosY, NESTZONE) {
+    return NESTZONE.RADIOUS < Math.sqrt(
+        Math.pow(dronePosX - NESTZONE.POSX, 2) + 
+        Math.pow(dronePosY - NESTZONE.POSY, 2))
+}
+
 // fetch drone positions from the web and update database
 // return pilots to be added to client's pilot list
-async function fetchDronePositions(URL_DRONE_POSITIONS)
+async function fetchDronePositions(URL_DRONE_POSITIONS, NESTZONE)
 {
-    // return list
-    var newPilots = [];
-
     // fetch drone postions data
     const response = await fetch(URL_DRONE_POSITIONS, {
     method: 'GET'
@@ -71,13 +80,19 @@ async function fetchDronePositions(URL_DRONE_POSITIONS)
     });
     const droneList = jsonFile.report.capture[0].drone;
 
+    // return pilot list
+    const newPilots = [];
+
     // get time 
     const snapshotTimestamp = jsonFile.report.capture[0]['$'].snapshotTimestamp;
 
-    // update database
     var droneSerialNumber;
     droneList.forEach((newDrone) => {
-        // check if drone is in no-fly zone
+        // if not violation, move to next drone
+        if (!isFlyZoneViolation(newDrone.positionX[0], newDrone.positionY[0], NESTZONE)) 
+        { return }
+        console.log(newDrone.positionX[0]);
+        console.log(newDrone.positionY[0]);
 
         // check if pilot already exits in database
         droneSerialNumber = newDrone.serialNumber[0];
@@ -124,11 +139,10 @@ app.post('/api', (request, response) => {
 
 // fetch data every 2 seconds
 setInterval( function () {
-    const jsonfile = fetchDronePositions(URL_DRONE_POSITIONS);   
+    const jsonfile = fetchDronePositions(URL_DRONE_POSITIONS, NESTZONE);   
    
 }, 10000);
 
 
 
-// start server
 exports.app = functions.https.onRequest(app);
