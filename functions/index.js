@@ -1,5 +1,7 @@
 
 const fetchData = require("./fetchData")
+const { parseString } = require("xml2js");
+const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
 
 
 const express = require('express');
@@ -45,6 +47,40 @@ async function getPilotList(){
     return pilotList;
 }
 
+// fetch drone positions from the web and update database
+async function fetchDronePositions(URL_DRONE_POSITIONS)
+{
+    const response = await fetch(URL_DRONE_POSITIONS, {
+    method: 'GET'
+        });
+    if ( !response.ok ) { 
+        console.log("ERROR: Fetch error >>> ", response.statusText);
+        return;
+    }
+    // parsing xml data to json
+
+    const xmlFile = await response.text();
+
+    var result;
+
+    parseString(xmlFile, function (parserError, jsonfile) {
+        result = jsonfile;
+
+        
+
+    });
+
+ 
+    const droneList = result.report.capture[0].drone;
+
+    droneList.forEach((newPilot) => {
+        console.log("print out ====", newPilot.serialNumber);
+    
+    }); 
+
+   
+}
+
 
 // test data                                                     TODO
 const newPilots = ["Ram", "Shyam", "Sita", "Gita"];
@@ -70,14 +106,14 @@ app.post('/api', (request, response) => {
     });
 });
 
+
 // fetch data every 2 seconds
-var dronePostions;
-dronePostions = fetchData.dronePostions();
 setInterval( function () {
-    
-
-
+    const jsonfile = fetchDronePositions(URL_DRONE_POSITIONS);   
+   
 }, 2000);
+
+
 
 // start server
 exports.app = functions.https.onRequest(app);
