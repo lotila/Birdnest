@@ -48,49 +48,64 @@ async function getPilotList(){
 }
 
 // fetch drone positions from the web and update database
+// return pilots to be added to client's pilot list
 async function fetchDronePositions(URL_DRONE_POSITIONS)
 {
+    // return list
+    var newPilots = [];
+
+    // fetch drone postions data
     const response = await fetch(URL_DRONE_POSITIONS, {
     method: 'GET'
         });
     if ( !response.ok ) { 
-        console.log("ERROR: Fetch error >>> ", response.statusText);
+        console.log("ERROR: Fetch error", response.statusText);
         return;
     }
-    // parsing xml data to json
 
     const xmlFile = await response.text();
-
-    var result;
-
-    parseString(xmlFile, function (parserError, jsonfile) {
-        result = jsonfile;
-
-        
-
+    var jsonFile;
+    // parsing xml data to json
+    parseString(xmlFile, function (parserError, result) {
+        jsonFile = result;
     });
+    const droneList = jsonFile.report.capture[0].drone;
 
- 
-    const droneList = result.report.capture[0].drone;
+    // get time 
+    const snapshotTimestamp = jsonFile.report.capture[0]['$'].snapshotTimestamp;
 
-    droneList.forEach((newPilot) => {
-        console.log("print out ====", newPilot.serialNumber);
-    
+    // update database
+    var droneSerialNumber;
+    droneList.forEach((newDrone) => {
+        // check if drone is in no-fly zone
+
+        // check if pilot already exits in database
+        droneSerialNumber = newDrone.serialNumber[0];
+        database.doc(droneSerialNumber).get().then((doc) => {
+            if (doc.exists) {
+                // drone exists in dabase, change time Of Last Violation           
+                doc.snapshotTimestamp =  snapshotTimestamp;
+            } else {
+                // drone doesn't exists, add drone
+                database.doc(droneSerialNumber).set({
+                    firstName: "jsdkjks",
+                    timeOfLastViolation: snapshotTimestamp
+                }).catch((error) => {
+                    console.log("ERROR Database add error", error);
+                }); 
+            }
+        }).catch((error) => {
+            console.log("ERROR Database access error", error);
+        });   
     }); 
 
-   
+    return newPilots;
 }
 
 
-// test data                                                     TODO
+// Pilots that are to be added and removed in next post request.
 const newPilots = ["Ram", "Shyam", "Sita", "Gita"];
 const oldPilots = ["Ram", "Shyam"];
-const allPilotsTes = {
-    firstName: "huh",
-    lastName: "dsdsds",
-    email: "Sita",
-    phoneNumber: "Gita"
-};
 
 // initial web request
 app.get('/',async (request,response) =>{
@@ -111,7 +126,7 @@ app.post('/api', (request, response) => {
 setInterval( function () {
     const jsonfile = fetchDronePositions(URL_DRONE_POSITIONS);   
    
-}, 2000);
+}, 10000);
 
 
 
