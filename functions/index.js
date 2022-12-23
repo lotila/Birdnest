@@ -64,10 +64,9 @@ function isFlyZoneViolation(dronePosX, dronePosY, NESTZONE) {
         Math.pow(dronePosY - NESTZONE.POSY, 2))
 }
 
-// fetch drone positions and pilot info from the web
-// update dataBase
-async function updatedataBase(
-    URL_DRONE_POSITIONS, URL_PILOT_INFO,  NESTZONE, newPilotsClient)
+// fetch drone positions and pilot info from the web,
+// update dataBase and newPilotsClient list
+async function fetchPilots(newPilotsClient)
 {
     // fetch drone postions data
     const response = await fetch(URL_DRONE_POSITIONS, {
@@ -99,7 +98,7 @@ async function updatedataBase(
         // check if drone already exits in dataBase
         droneSerialNumber = newDrone.serialNumber[0];
         dataBase.doc(droneSerialNumber).get().then((pilotInDatabase) => {
-            if (pilotInDatabase.exists) {
+            if (pilotInDatabase.exists || pilotInDatabase.empty) {
                 // drone exists in dataBase, change time Of Last Violation           
                 pilotInDatabase.snapshotTimestamp =  snapshotTimestamp;
             } 
@@ -117,7 +116,7 @@ async function updatedataBase(
 
                         // add pilot to dataBase
                         dataBase.doc(droneSerialNumber).set( {
-                            docfirstName: pilotInfo.firstName,
+                            firstName: pilotInfo.firstName,
                             lastName: pilotInfo.lastName,
                             phoneNumber: pilotInfo.phoneNumber,
                             email: pilotInfo.email,
@@ -134,13 +133,14 @@ async function updatedataBase(
     }); 
 }
 
+function removeOldPilots(oldPilotsClient) {
+
+}
 
 // Pilots that are to be added and removed in the next request.
 var newPilotsClient = [];
 var oldPilotsClient = [];
 
-
-  
 // initial web request
 app.get('/',async (request,response) =>{
     const allPilots = await getPilotList();
@@ -148,7 +148,7 @@ app.get('/',async (request,response) =>{
     console.log("Add pilots >>>>>>", allPilots)
 });
 
-// update pilot list data
+// update pilot list request
 app.post('/api', (request, response) => {
     response.json({
     addPilots: newPilotsClient,
@@ -157,15 +157,19 @@ app.post('/api', (request, response) => {
     console.log("New pilots to be added >>>>>>>", newPilotsClient);
     console.log("New pilots to be removed >>>>>>>", oldPilotsClient);
     // clear arrays
-    newPilotsClient.length = 0;
-    oldPilotsClient.length = 0;
+    newPilotsClient.length = [];
+    oldPilotsClient.length = [];
 });
 
 // fetch data every 2 seconds
 setInterval( function () {
-    updatedataBase(
-        URL_DRONE_POSITIONS, URL_PILOT_INFO, NESTZONE, newPilotsClient); 
-},2000);
+    // fetch drone positions and pilot info from the web,
+    // update dataBase and newPilotsClient list
+    fetchPilots(newPilotsClient); 
+
+    // remove 10 min old pilots from database and add them to oldPilotsClient list
+    removeOldPilots(oldPilotsClient);
+},5000);
 
 
 exports.app = functions.https.onRequest(app);
