@@ -64,34 +64,10 @@ function isFlyZoneViolation(dronePosX, dronePosY, NESTZONE) {
         Math.pow(dronePosY - NESTZONE.POSY, 2))
 }
 
-// fetch pilot info
-async function fetchPilotInfo(
-    droneSerialNumber, snapshotTimestamp, URL_PILOT_INFO) {
-    // fetch
-    const response = await fetch(URL_PILOT_INFO + droneSerialNumber, {
-        method: 'GET'
-            });
-    if ( !response.ok ) { 
-        console.log("ERROR: Fetch pilot info error", response.statusText);
-        return result;
-    }
-    const pilotInfo = await response.json();
-    // add pilot to dataBase
-    dataBase.doc(droneSerialNumber).set({
-        firstName: pilotInfo.firstName,
-        lastName: pilotInfo.lastName,
-        phoneNumber: pilotInfo.phoneNumber,
-        email: pilotInfo.email,
-        timeOfLastViolation: snapshotTimestamp
-    }).catch((error) => {
-        console.log("ERROR dataBase add error", error);
-    }); 
-}
-
 // fetch drone positions and pilot info from the web
 // update dataBase
 async function updatedataBase(
-    URL_DRONE_POSITIONS, URL_PILOT_INFO,  NESTZONE)
+    URL_DRONE_POSITIONS, URL_PILOT_INFO,  NESTZONE, newPilotsClient)
 {
     // fetch drone postions data
     const response = await fetch(URL_DRONE_POSITIONS, {
@@ -101,8 +77,9 @@ async function updatedataBase(
         console.log("ERROR: Fetch drone positions error", response.statusText);
         return;
     }
-
+    // get xml
     const xmlFile = await response.text();
+
     var jsonFile;
     // parsing xml data to json
     parseString(xmlFile, function (parserError, result) {
@@ -114,70 +91,81 @@ async function updatedataBase(
     const snapshotTimestamp = jsonFile.report.capture[0]['$'].snapshotTimestamp;
 
     var droneSerialNumber;
-    droneList.forEach((newDrone) => {
+    droneList.forEach( (newDrone) => {
         // if not violation, move to next drone
         if (!isFlyZoneViolation(newDrone.positionX[0], newDrone.positionY[0], NESTZONE)) 
         { return }
 
         // check if drone already exits in dataBase
         droneSerialNumber = newDrone.serialNumber[0];
-        dataBase.doc(droneSerialNumber).get().then((doc) => {
-            if (doc.exists) {
+        dataBase.doc(droneSerialNumber).get().then((pilotInDatabase) => {
+            if (pilotInDatabase.exists) {
                 // drone exists in dataBase, change time Of Last Violation           
-                doc.snapshotTimestamp =  snapshotTimestamp;
-            } else {
-                // drone doesn't exists, add new pilot
-                fetchPilotInfo(droneSerialNumber, snapshotTimestamp, URL_PILOT_INFO);
+                pilotInDatabase.snapshotTimestamp =  snapshotTimestamp;
+            } 
+            else {
+                // drone doesn't exists, fetch new pilot
+                fetch(URL_PILOT_INFO + droneSerialNumber, {
+                    method: 'GET'
+                    }).then( async (response) => {
+                        // get json
+                        const pilotInfo = await response.json();
+                        
+                        // add pilot to client's list
+                        newPilotsClient.push(viewFormat(pilotInfo.firstName, 
+                            pilotInfo.lastName, pilotInfo.email, pilotInfo.phoneNumber));
+
+                        // add pilot to dataBase
+                        dataBase.doc(droneSerialNumber).set( {
+                            docfirstName: pilotInfo.firstName,
+                            lastName: pilotInfo.lastName,
+                            phoneNumber: pilotInfo.phoneNumber,
+                            email: pilotInfo.email,
+                            timeOfLastViolation: snapshotTimestamp
+                        });
+                    }).catch((error) => {
+                        console.log("ERROR: Fetch pilot info error", error);
+                        return;
+                });
             }
         }).catch((error) => {
-            console.log("ERROR dataBase access error", error);
+            console.log("ERROR: dataBase access error", error);
         });   
     }); 
 }
 
 
 // Pilots that are to be added and removed in the next request.
-var newPilots = [];
-var oldPilots = [];
+var newPilotsClient = [];
+var oldPilotsClient = [];
 
-// look for database update and queue pilot list update for client
-dataBase.onSnapshot(querySnapshot => {
-    querySnapshot.docChanges().forEach(change => {
-      if (change.type === 'added') {
-          newPilots.push(viewFormat(change.doc.data().firstName,change.doc.data().lastName, 
-          change.doc.data().email, change.doc.data().phoneNumber))
-      }
-      if (change.type === 'removed') {
-          oldPilots.push(viewFormat(change.doc.data().firstName,change.doc.data().lastName, 
-          change.doc.data().email, change.doc.data().phoneNumber))
-      }
-    });
-  });
+
   
 // initial web request
-newPilots.length=0;
 app.get('/',async (request,response) =>{
     const allPilots = await getPilotList();
     response.render('index',{allPilots});
+    console.log("Add pilots >>>>>>", allPilots)
 });
 
 // update pilot list data
 app.post('/api', (request, response) => {
     response.json({
-    addPilots: newPilots,
-    removePilots: oldPilots
+    addPilots: newPilotsClient,
+    removePilots: oldPilotsClient
     });
+    console.log("New pilots to be added >>>>>>>", newPilotsClient);
+    console.log("New pilots to be removed >>>>>>>", oldPilotsClient);
     // clear arrays
-    newPilots.length = 0;
-    oldPilots.length = 0;
+    newPilotsClient.length = 0;
+    oldPilotsClient.length = 0;
 });
 
 // fetch data every 2 seconds
 setInterval( function () {
     updatedataBase(
-        URL_DRONE_POSITIONS, URL_PILOT_INFO, NESTZONE); 
-
-}, 10000);
+        URL_DRONE_POSITIONS, URL_PILOT_INFO, NESTZONE, newPilotsClient); 
+},2000);
 
 
 exports.app = functions.https.onRequest(app);
