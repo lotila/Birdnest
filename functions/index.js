@@ -1,6 +1,7 @@
 const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
 const URL_PILOT_INFO = "https://assignments.reaktor.com/birdnest/pilots/";
 
+// nest zone (in millimeters)
 const NESTZONE = {
     POSX: 250000,
     POSY: 250000,
@@ -9,10 +10,12 @@ const NESTZONE = {
 
 // error codes
 const ERROR = {
-    DB_ACCESS: "ERROR: dataBase access error",
+    DB_ACCESS: "ERROR: DataBase access error",
     FETCH_PILOT: "ERROR: Fetch pilot info error",
     FETCH_DRONES: "ERROR: Fetch drone positions error"
-}
+};
+// remove pilots in 10 minutes (in milliseconds)
+const PILOT_TIME_OUT = 10*60*1000;
 
 // xml to json 
 const { parseString } = require("xml2js");
@@ -34,7 +37,7 @@ app.set('view engine','hbs');
 // limit trasfer size
 app.use(express.json({ limit: '1mb' }));
 
-// available on the local host 
+// available on the localhost:5000
 var serviceAccount = require("../../dronetracking.json");
 const { response } = require("express");
 admin.initializeApp({
@@ -65,11 +68,13 @@ function viewFormat(firstName, lastName, email, phoneNumber) {
 
 // get pilot list from the dataBase for client
 async function getPilotList(){
-    const snapshot = await dataBase.get();
+    const snapshotOfDatabase = await dataBase.get();
     var pilotList = [];
-    snapshot.forEach(doc => {
-        pilotList.push(viewFormat(doc.data().firstName, doc.data().lastName,
-        doc.data().email, doc.data().phoneNumber));
+    var pilotInfo;
+    snapshotOfDatabase.forEach(pilot => {
+        pilotInfo = pilot.data();
+        pilotList.push(viewFormat(pilotInfo.firstName, pilotInfo.lastName,
+            pilotInfo.email, pilotInfo.phoneNumber));
     });
     return pilotList;
 }
@@ -104,7 +109,7 @@ async function fetchDrones()
     const droneList = dronesInJsonFile.report.capture[0].drone;
 
     // get time 
-    const snapshotTimestamp = dronesInJsonFile.report.capture[0]['$'].snapshotTimestamp;
+    const timeOfLastViolation = dronesInJsonFile.report.capture[0]['$'].snapshotTimestamp;
 
     var droneSerialNumber;
     droneList.forEach( (newDrone) => {
@@ -115,33 +120,33 @@ async function fetchDrones()
 
         const mapData =  {
             promis: dataBase.doc(droneSerialNumber).get(), 
-            snapshotTimestamp: snapshotTimestamp
+            timeOfLastViolation: timeOfLastViolation
         };
         // check if there is fetch promis for pilot already
         if (promisedPilots.has(droneSerialNumber)){
             promisedPilots.set(droneSerialNumber, {
                 // promis found, update time for that promis
                 promis: promisedPilots.get(droneSerialNumber).promis, 
-                snapshotTimestamp: snapshotTimestamp 
+                timeOfLastViolation: timeOfLastViolation 
             });
         }
         else{
             promisedPilots.set(droneSerialNumber, mapData); 
             // activate fetch promis for pilot
-            fetchPilot(mapData.promis, droneSerialNumber, mapData.snapshotTimestamp);
+            fetchPilot(mapData.promis, droneSerialNumber, mapData.timeOfLastViolation);
         }
     }); 
     }
 
 // when promise settles, add pilot to database and newPilotsClient list
 function fetchPilot(pilotRequestFromDatabase, 
-    droneSerialNumber, snapshotTimestamp) 
+    droneSerialNumber, timeOfLastViolation) 
 {
     pilotRequestFromDatabase.then( async(pilotInDatabase) => {
     // check if drone already exists in dataBase
     if (pilotInDatabase.exists) {
         // drone exists in dataBase, change time Of Last Violation           
-        pilotInDatabase.snapshotTimestamp =  snapshotTimestamp;
+        pilotInDatabase.timeOfLastViolation =  timeOfLastViolation;
     } 
     else {
         // drone doesn't exists, fetch new pilot
@@ -158,7 +163,7 @@ function fetchPilot(pilotRequestFromDatabase,
                 lastName: pilotInfo.lastName,
                 phoneNumber: pilotInfo.phoneNumber,
                 email: pilotInfo.email,
-                timeOfLastViolation: snapshotTimestamp
+                timeOfLastViolation: timeOfLastViolation
             }).then(() => {
                 // add pilot to client's list
                 newPilotsClient.push(viewFormat(pilotInfo.firstName, 
@@ -171,7 +176,27 @@ function fetchPilot(pilotRequestFromDatabase,
 }
 
 
-async function removeOldPilots() {
+async function removeOldPilots() 
+{
+    // older pilots than this will be removed
+    const pilotTimeOutTime = new Date().getTime() - PILOT_TIME_OUT;
+
+
+    // get all pilots
+    const snapshotOfDatabase = await dataBase.get();
+
+    // compere last violation to pilot time out time
+    var pilotInfo;
+    snapshotOfDatabase.forEach( async (pilot) => {
+        pilotInfo = pilot.data();
+        if (new Date(pilotInfo.timeOfLastViolation).getTime() - pilotTimeOutTime  < 0)
+        {
+            oldPilotsClient.push(viewFormat(pilotInfo.firstName, pilotInfo.lastName, 
+                pilotInfo.email, pilotInfo.phoneNumber))
+
+            await dataBase.doc(pilot.id).delete();
+        }
+    });
 }
 
 
@@ -201,6 +226,8 @@ setInterval( async function ()
     // fetch drone positions and pilot info from the web,
     // update dataBase and newPilotsClient list
     await fetchDrones();
+
+
 
     // remove 10 min old pilots from database and add them to oldPilotsClient list
     await removeOldPilots();
