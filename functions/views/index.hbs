@@ -3,7 +3,7 @@
   <body>
     <fieldset>
       <legend>Drone fly zone violations</legend>
-         <ul id="pilotList"></ul>
+         <ol id="pilotList"></ol>
     </fieldset>
   </body>
   <script>
@@ -17,7 +17,7 @@
       var index;
       var listItem;
 
-        // initial pilot list
+        // initial pilot list from database
       {{#each allPilots}}
         listItem = document.createElement("li");
         listItem.innerText = '{{this}}';
@@ -25,8 +25,8 @@
       {{/each}}
 
       // reguest data from server every 2 seconds
-      setInterval( async function () {
-
+      setInterval( async function () 
+      {
         // request data
         response = await fetch('/api', {
           method: 'POST'
@@ -48,7 +48,7 @@
           listItem.innerText = newPilot;
           pilotList.appendChild(listItem);
         });
-      },2000);
+      },5000);
   });
   </script>
 </html>

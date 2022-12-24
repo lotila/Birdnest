@@ -7,6 +7,13 @@ const NESTZONE = {
     RADIOUS: 100000
 };
 
+// error codes
+const ERROR = {
+    DB_ACCESS: "ERROR: dataBase access error",
+    FETCH_PILOT: "ERROR: Fetch pilot info error",
+    FETCH_DRONES: "ERROR: Fetch drone positions error"
+}
+
 // xml to json 
 const { parseString } = require("xml2js");
 
@@ -24,6 +31,9 @@ app.engine('hbs',engines.handlebars);
 app.set('views','./views');
 app.set('view engine','hbs');
 
+// limit trasfer size
+app.use(express.json({ limit: '1mb' }));
+
 // available on the local host 
 var serviceAccount = require("../../dronetracking.json");
 const { response } = require("express");
@@ -34,11 +44,18 @@ credential: admin.credential.cert(serviceAccount)
 // available on the web
 //admin.initializeApp(functions.config().firebase);
 
+
 // dataBase
 const dataBase = admin.firestore().collection('pilot_data');
 
-// limit trasfer size
-app.use(express.json({ limit: '1mb' }));
+// Pilots that are to be added and removed in the next request.
+var newPilotsClient = [];
+var oldPilotsClient = [];
+
+// list of promises to fetch pilots.
+// to be added in database and newPilotsClient list
+    // key = drone serial number
+var promisedPilots = new Map();
 
 // data format for client
 function viewFormat(firstName, lastName, email, phoneNumber) {
@@ -65,81 +82,98 @@ function isFlyZoneViolation(dronePosX, dronePosY, NESTZONE) {
 }
 
 // fetch drone positions and pilot info from the web,
-// update dataBase and newPilotsClient list
-async function fetchPilots(newPilotsClient)
+async function fetchDrones()
 {
     // fetch drone postions data
-    const response = await fetch(URL_DRONE_POSITIONS, {
-    method: 'GET'
+    const dronesResponse = await fetch(URL_DRONE_POSITIONS, {
+        method: 'GET'
         });
-    if ( !response.ok ) { 
-        console.log("ERROR: Fetch drone positions error", response.statusText);
+    if ( !dronesResponse.ok ) { 
+        console.log(ERROR.FETCH_DRONES, response.statusText);
         return;
     }
     // get xml
-    const xmlFile = await response.text();
+    const xmlFile = await dronesResponse.text();
 
-    var jsonFile;
     // parsing xml data to json
+    var dronesInJsonFile;
     parseString(xmlFile, function (parserError, result) {
-        jsonFile = result;
+        dronesInJsonFile = result;
     });
-    const droneList = jsonFile.report.capture[0].drone;
+    // get list of drones
+    const droneList = dronesInJsonFile.report.capture[0].drone;
 
     // get time 
-    const snapshotTimestamp = jsonFile.report.capture[0]['$'].snapshotTimestamp;
+    const snapshotTimestamp = dronesInJsonFile.report.capture[0]['$'].snapshotTimestamp;
 
     var droneSerialNumber;
     droneList.forEach( (newDrone) => {
+        droneSerialNumber = newDrone.serialNumber[0];
         // if not violation, move to next drone
         if (!isFlyZoneViolation(newDrone.positionX[0], newDrone.positionY[0], NESTZONE)) 
         { return }
 
-        // check if drone already exits in dataBase
-        droneSerialNumber = newDrone.serialNumber[0];
-        dataBase.doc(droneSerialNumber).get().then((pilotInDatabase) => {
-            if (pilotInDatabase.exists || pilotInDatabase.empty) {
-                // drone exists in dataBase, change time Of Last Violation           
-                pilotInDatabase.snapshotTimestamp =  snapshotTimestamp;
-            } 
-            else {
-                // drone doesn't exists, fetch new pilot
-                fetch(URL_PILOT_INFO + droneSerialNumber, {
-                    method: 'GET'
-                    }).then( async (response) => {
-                        // get json
-                        const pilotInfo = await response.json();
-                        
-                        // add pilot to client's list
-                        newPilotsClient.push(viewFormat(pilotInfo.firstName, 
-                            pilotInfo.lastName, pilotInfo.email, pilotInfo.phoneNumber));
-
-                        // add pilot to dataBase
-                        dataBase.doc(droneSerialNumber).set( {
-                            firstName: pilotInfo.firstName,
-                            lastName: pilotInfo.lastName,
-                            phoneNumber: pilotInfo.phoneNumber,
-                            email: pilotInfo.email,
-                            timeOfLastViolation: snapshotTimestamp
-                        });
-                    }).catch((error) => {
-                        console.log("ERROR: Fetch pilot info error", error);
-                        return;
-                });
-            }
-        }).catch((error) => {
-            console.log("ERROR: dataBase access error", error);
-        });   
+        const mapData =  {
+            promis: dataBase.doc(droneSerialNumber).get(), 
+            snapshotTimestamp: snapshotTimestamp
+        };
+        // check if there is fetch promis for pilot already
+        if (promisedPilots.has(droneSerialNumber)){
+            promisedPilots.set(droneSerialNumber, {
+                // promis found, update time for that promis
+                promis: promisedPilots.get(droneSerialNumber).promis, 
+                snapshotTimestamp: snapshotTimestamp 
+            });
+        }
+        else{
+            promisedPilots.set(droneSerialNumber, mapData); 
+            // activate fetch promis for pilot
+            fetchPilot(mapData.promis, droneSerialNumber, mapData.snapshotTimestamp);
+        }
     }); 
+    }
+
+// when promise settles, add pilot to database and newPilotsClient list
+function fetchPilot(pilotRequestFromDatabase, 
+    droneSerialNumber, snapshotTimestamp) 
+{
+    pilotRequestFromDatabase.then( async(pilotInDatabase) => {
+    // check if drone already exists in dataBase
+    if (pilotInDatabase.exists) {
+        // drone exists in dataBase, change time Of Last Violation           
+        pilotInDatabase.snapshotTimestamp =  snapshotTimestamp;
+    } 
+    else {
+        // drone doesn't exists, fetch new pilot
+        fetch(URL_PILOT_INFO + droneSerialNumber, {
+            method: 'GET'
+        }).then((pilotResponse) => 
+        {
+            // get json
+            pilotResponse.json().then( (pilotInfo) => {
+
+            // add pilot to dataBase
+            dataBase.doc(droneSerialNumber).set( {
+                firstName: pilotInfo.firstName,
+                lastName: pilotInfo.lastName,
+                phoneNumber: pilotInfo.phoneNumber,
+                email: pilotInfo.email,
+                timeOfLastViolation: snapshotTimestamp
+            }).then(() => {
+                // add pilot to client's list
+                newPilotsClient.push(viewFormat(pilotInfo.firstName, 
+                pilotInfo.lastName, pilotInfo.email, pilotInfo.phoneNumber));
+            })
+        })
+        })
+    }
+    });
 }
 
-function removeOldPilots(oldPilotsClient) {
 
+async function removeOldPilots() {
 }
 
-// Pilots that are to be added and removed in the next request.
-var newPilotsClient = [];
-var oldPilotsClient = [];
 
 // initial web request
 app.get('/',async (request,response) =>{
@@ -162,14 +196,15 @@ app.post('/api', (request, response) => {
 });
 
 // fetch data every 2 seconds
-setInterval( function () {
+setInterval( async function () 
+{
     // fetch drone positions and pilot info from the web,
     // update dataBase and newPilotsClient list
-    fetchPilots(newPilotsClient); 
+    await fetchDrones();
 
     // remove 10 min old pilots from database and add them to oldPilotsClient list
-    removeOldPilots(oldPilotsClient);
-},5000);
+    await removeOldPilots();
+},2000);
 
 
 exports.app = functions.https.onRequest(app);
