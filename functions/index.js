@@ -16,7 +16,7 @@ const ERROR = {
     FETCH_DRONES: "ERROR: Fetch drone positions error"
 };
 // remove pilots in 10 minutes (in milliseconds)
-const PILOT_TIME_OUT = 60*1000;
+const PILOT_TIME_OUT = 10*60*1000;
 
 // xml to json 
 const { parseString } = require("xml2js");
@@ -70,12 +70,6 @@ var promisedPilots = new Map();
 // data = timeOfLastViolation
 var toBeRemovedPilots = new Map();
 
-// data format for client
-function viewFormat(firstName, lastName, email, phoneNumber) {
-     return firstName + " " + lastName
-        + " " + email + " " + phoneNumber;
-}
-
 // get pilot list from the dataBase for client
 async function getPilotList(){
     const snapshotOfDatabase = await dataBase.get();
@@ -92,8 +86,12 @@ async function getPilotList(){
         }
         else {
             // pilot to be added to client's pilot list
-            pilotList.push(viewFormat(pilotInfo.firstName, pilotInfo.lastName,
-                pilotInfo.email, pilotInfo.phoneNumber));
+            pilotList.push({
+                firstName: pilotInfo.firstName, 
+                lastName: pilotInfo.lastName,
+                email: pilotInfo.email,
+                phoneNumber: pilotInfo.phoneNumber
+            });
 
             // added to list to be removed after 10 minutes
             toBeRemovedPilots.set(pilot.id, pilotInfo.timeOfLastViolation);
@@ -195,9 +193,12 @@ function fetchPilot(pilotRequestFromDatabase,
                 timeOfLastViolation: timeOfLastViolation
             }).then(() => {
                 // add pilot to client's list
-                newPilotsClient.push(viewFormat(pilotInfo.firstName, 
-                pilotInfo.lastName, pilotInfo.email, pilotInfo.phoneNumber));
-
+                newPilotsClient.push({
+                    firstName: pilotInfo.firstName, 
+                    lastName: pilotInfo.lastName,
+                    email: pilotInfo.email,
+                    phoneNumber: pilotInfo.phoneNumber
+                });
                 // remove from promised pilots list
                 promisedPilots.delete(droneSerialNumber);
             })
@@ -224,8 +225,12 @@ function removeOldPilots()
 
                 const pilotInfo = databaseResponse.data();
                 // add pilot to list to be removed from client
-                oldPilotsClient.push(viewFormat(pilotInfo.firstName, pilotInfo.lastName, 
-                    pilotInfo.email, pilotInfo.phoneNumber));
+                oldPilotsClient.push({
+                    firstName: pilotInfo.firstName, 
+                    lastName: pilotInfo.lastName,
+                    email: pilotInfo.email,
+                    phoneNumber: pilotInfo.phoneNumber
+                });
                     // delete pilot from database
                     databaseResponse.ref.delete().catch((dbDeleteFileError) => {
                         console.log(ERROR.DB_DELETE_PILOT, dbDeleteFileError);

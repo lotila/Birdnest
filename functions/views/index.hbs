@@ -7,6 +7,11 @@
     </fieldset>
   </body>
   <script>
+    // data format for a row
+    function viewFormat(pilot) {
+     return pilot.firstName + " " + pilot.lastName
+        + " " + pilot.email + " " + pilot.phoneNumber;
+    }
     // page is fully loaded
     document.addEventListener('DOMContentLoaded', function () 
     { 
@@ -20,7 +25,12 @@
         // initial pilot list from database
       {{#each allPilots}}
         listItem = document.createElement("li");
-        listItem.innerText = '{{this}}';
+        listItem.innerText = viewFormat({
+          firstName: "{{this.firstName}}",
+          lastName:  "{{this.lastName}}",
+          email:  "{{this.email}}",
+          phoneNumber:  "{{this.phoneNumber}}"
+        });
         pilotList.appendChild(listItem);
       {{/each}}
 
@@ -36,7 +46,7 @@
         // remove old pilots from list
         update.removePilots.forEach((oldPilot) => {
           for (index = 0; index < pilotListElements.length; index++) {
-            if ( oldPilot == pilotListElements.item(index).innerHTML) {
+            if ( viewFormat(oldPilot) == pilotListElements.item(index).innerHTML) {
               pilotListElements.item(index).remove();
             }
           };
@@ -45,10 +55,10 @@
         // add new pilots to list
         update.addPilots.forEach((newPilot) => {
           listItem = document.createElement("li");
-          listItem.innerText = newPilot;
+          listItem.innerText = viewFormat(newPilot);
           pilotList.appendChild(listItem);
         });
-      },5000);
+      },2000);
   });
   </script>
 </html>
