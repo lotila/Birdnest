@@ -1,7 +1,7 @@
 {
   "name": "birdnest",
   "version": "1.0.0",
-  "description": "Drone tracking for no-fly zone violations.",
+  "description": "Drone tracking for fly zone violations.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
