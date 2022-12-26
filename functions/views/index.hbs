@@ -16,7 +16,9 @@
     document.addEventListener('DOMContentLoaded', function () 
     { 
       const pilotList = document.getElementById("pilotList");
-      const pilotListElements = pilotList.getElementsByTagName("li");
+      const LIST_TYPE = "p";
+      const UPDATE_RATE = 2000;
+      const pilotListElements = pilotList.getElementsByTagName(LIST_TYPE);
       var response;
       var update;
       var index;
@@ -24,7 +26,7 @@
 
         // initial pilot list from database
       {{#each allPilots}}
-        listItem = document.createElement("li");
+        listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
           firstName: "{{this.firstName}}",
           lastName:  "{{this.lastName}}",
@@ -54,11 +56,11 @@
 
         // add new pilots to list
         update.addPilots.forEach((newPilot) => {
-          listItem = document.createElement("li");
+          listItem = document.createElement(LIST_TYPE);
           listItem.innerText = viewFormat(newPilot);
           pilotList.appendChild(listItem);
         });
-      },2000);
+      },UPDATE_RATE);
   });
   </script>
 </html>
