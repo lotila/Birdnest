@@ -16,51 +16,54 @@
     document.addEventListener('DOMContentLoaded', function () 
     { 
       const pilotList = document.getElementById("pilotList");
-      const LIST_TYPE = "p";
-      const UPDATE_RATE = 2000;
+      const LIST_TYPE = "li";
+      const UPDATE_TIME = 2000;
       const pilotListElements = pilotList.getElementsByTagName(LIST_TYPE);
       var response;
       var update;
       var index;
       var listItem;
 
-        // initial pilot list from database
+      // initial pilot list
       {{#each allPilots}}
         listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
-          firstName: "{{this.firstName}}",
-          lastName:  "{{this.lastName}}",
-          email:  "{{this.email}}",
-          phoneNumber:  "{{this.phoneNumber}}"
+          firstName: "{{this.firstName}}".toString(),
+          lastName:  "{{this.lastName}}".toString(),
+          email:  "{{this.email}}".toString(),
+          phoneNumber:  "{{this.phoneNumber}}".toString()
         });
         pilotList.appendChild(listItem);
       {{/each}}
 
       // reguest data from server every 2 seconds
-      setInterval( async function () 
+      setInterval( function () 
       {
         // request data
-        response = await fetch('/api', {
+        fetch('/api', {
           method: 'GET'
-        });
-        update = await response.json();
-
-        // remove old pilots from list
-        update.removePilots.forEach((oldPilot) => {
-          for (index = 0; index < pilotListElements.length; index++) {
-            if ( viewFormat(oldPilot) == pilotListElements.item(index).innerHTML) {
-              pilotListElements.item(index).remove();
-            }
-          };
-        });
-
-        // add new pilots to list
-        update.addPilots.forEach((newPilot) => {
-          listItem = document.createElement(LIST_TYPE);
-          listItem.innerText = viewFormat(newPilot);
-          pilotList.appendChild(listItem);
-        });
-      },UPDATE_RATE);
+        }).then((response) => 
+        {
+          // get json
+          response.json().then((update) =>
+           {
+            // remove old pilots from list
+            update.removePilots.forEach((oldPilot) => {
+              for (index = 0; index < pilotListElements.length; index++) {
+                if ( viewFormat(oldPilot) == pilotListElements.item(index).innerHTML) {
+                  pilotListElements.item(index).remove();
+                }
+              };
+            });
+            // add new pilots to list
+            update.addPilots.forEach((newPilot) => {
+              listItem = document.createElement(LIST_TYPE);
+              listItem.innerText = viewFormat(newPilot);
+              pilotList.appendChild(listItem);
+            });
+          }).catch((error) => console.log(error));
+        }).catch((error) => console.log(error));
+      },UPDATE_TIME);
   });
   </script>
 </html>
