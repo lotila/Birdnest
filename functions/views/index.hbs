@@ -30,9 +30,9 @@
         listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
           firstName: "{{{this.firstName}}}",
-          lastName:  "{{this.lastName}}".toString(),
-          email:  "{{this.email}}".toString(),
-          phoneNumber:  "{{this.phoneNumber}}".toString()
+          lastName:  "{{{this.lastName}}}",
+          email:  "{{{this.email}}}",
+          phoneNumber:  "{{{this.phoneNumber}}}"
         });
         pilotList.appendChild(listItem);
       {{/each}}
