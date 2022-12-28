@@ -17,19 +17,19 @@
     { 
       const pilotList = document.getElementById("pilotList");
       const LIST_TYPE = "li";
-      const UPDATE_TIME = 10000;
+      const UPDATE_TIME = 2000;
       const pilotListElements = pilotList.getElementsByTagName(LIST_TYPE);
       var response;
       var update;
       var index;
       var listItem;
-      var timeStamp = new Date().getTime()//"{{tranferData.timeStamp}}".getTime();
+      var timeStamp = "{{tranferData.timeStamp}}"
 
       // initial pilot list
       {{#each tranferData.allPilots}}
         listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
-          firstName: "{{this.firstName}}".toString(),
+          firstName: "{{{this.firstName}}}",
           lastName:  "{{this.lastName}}".toString(),
           email:  "{{this.email}}".toString(),
           phoneNumber:  "{{this.phoneNumber}}".toString()
