@@ -17,15 +17,16 @@
     { 
       const pilotList = document.getElementById("pilotList");
       const LIST_TYPE = "li";
-      const UPDATE_TIME = 2000;
+      const UPDATE_TIME = 10000;
       const pilotListElements = pilotList.getElementsByTagName(LIST_TYPE);
       var response;
       var update;
       var index;
       var listItem;
+      var timeStamp = new Date().getTime()//"{{tranferData.timeStamp}}".getTime();
 
       // initial pilot list
-      {{#each allPilots}}
+      {{#each tranferData.allPilots}}
         listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
           firstName: "{{this.firstName}}".toString(),
@@ -41,7 +42,9 @@
       {
         // request data
         fetch('/api', {
-          method: 'GET'
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
+          body: timeStamp
         }).then((response) => 
         {
           // get json
@@ -61,6 +64,8 @@
               listItem.innerText = viewFormat(newPilot);
               pilotList.appendChild(listItem);
             });
+            // update timeStamp
+            timeStamp = update.timeStamp;
           }).catch((error) => console.log(error));
         }).catch((error) => console.log(error));
       },UPDATE_TIME);
