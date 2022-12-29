@@ -9,6 +9,11 @@ Setup dependencies
 npm i
 ```
 
+Log into firebase
+```
+firebase login
+```
+
 Run on local URL
 ```
 firebase emulators:start
@@ -16,5 +21,5 @@ firebase emulators:start
 
 Deploy website
 ```
-firebase deploy
+firebase deploy --only hosting,functions
 ```
