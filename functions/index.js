@@ -64,7 +64,6 @@ const activePilots = new Map();
 const flyZoneViolations = new Map();
 
 // promisedPilots strores drone serial numbers while loading is in progress
-// key = drone serial number
 const promisedPilots = new Set();
 
 // timeStampedPilots stores add updates for client
@@ -73,16 +72,11 @@ const promisedPilots = new Set();
 const timeStampedPilots = new Map();
 
 // timeStampedOldPilots stores remove updates for client
-// key = time stamp
-// data = {
-//    firstName:
-//    lastName: 
-//    email: 
-//    phoneNumber:
-//}
+// key =  drone serial number
+// data = time stamp
 const timeStampedOldPilots = new Map();
 
-// when server updates activePilots, time increases
+// time is updates, when activePilots chenges
 var currentTimeStamp = 0;
 
 
@@ -205,11 +199,17 @@ function fetchPilot(droneSerialNumber)
 function removeOldPilots() 
 {
     // remove old timeStamps
-    timeStampedOldPilots.forEach((pilotInfo, timeStamp) => 
+    timeStampedOldPilots.forEach((timeStamp, droneSerialNumber) => 
     {
         if (isTimeOut(timeStamp, TIME_STAMP_TIME_OUT))
         {
-            timeStampedOldPilots.delete(timeStamp);
+            // remove time stamp
+            timeStampedOldPilots.delete(droneSerialNumber);
+
+            // remove from activePilots
+            activePilots.delete(droneSerialNumber);
+
+            console.log("delete drone:", droneSerialNumber);
         }
     })
 
@@ -224,27 +224,15 @@ function removeOldPilots()
                     timeStampedPilots.delete(timeStampedDroneSerialNumber);
                 }
             });
-            // update timeStampedOldPilots 
+            // add to timeStampedOldPilots 
             const newTimeStamp =  new Date().getTime();
-            if(timeStampedOldPilots.has(newTimeStamp)) {
-                const pilots = timeStampedOldPilots.get(newTimeStamp);
-                pilots.add(activePilots.get(droneSerialNumber));
-                timeStampedOldPilots.set(newTimeStamp, pilots);
-            }
-            else {
-                const pilots = new Set();
-                pilots.add(activePilots.get(droneSerialNumber));
-                timeStampedOldPilots.set(newTimeStamp, pilots);
-            }
+            timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
+            
+            // update current time stamp
             if ( currentTimeStamp < newTimeStamp ) {currentTimeStamp = newTimeStamp; }
 
-             // remove from activePilots
-             activePilots.delete(droneSerialNumber);
-
-             // remove from flyZoneViolations
-             flyZoneViolations.delete(droneSerialNumber);
-
-            console.log("delete drone:", droneSerialNumber);
+            // remove from flyZoneViolations
+            flyZoneViolations.delete(droneSerialNumber);
         }
     });
 }
@@ -281,11 +269,9 @@ app.post('/api', (request, response) =>
     });
     // get pilots that should be deleted from client
     const pilotsToBeRemoved = [];
-    timeStampedOldPilots.forEach((pilots, timeStamp) => {
+    timeStampedOldPilots.forEach((timeStamp, droneSerialNumber) => {
         if (clientTimeStamp < timeStamp) {
-            pilots.forEach((pilotInfo) => {
-                pilotsToBeRemoved.push(pilotInfo);
-            });
+            pilotsToBeRemoved.push(activePilots.get(droneSerialNumber));
         }
     });
     // send data
@@ -294,9 +280,9 @@ app.post('/api', (request, response) =>
         removePilots: pilotsToBeRemoved,
         timeStamp: currentTimeStamp
     });
-    console.log("Pilots to be removed (" + activePilots.size + 
-        ")[" + flyZoneViolations.size +"][" + timeStampedPilots.size + 
-        "]{"+  timeStampedOldPilots.size+ "} removed", pilotsToBeRemoved);
+    console.log("Pilots to be removed (" + timeStampedPilots.size + 
+        ")(" + flyZoneViolations.size +")[" + timeStampedOldPilots.size + 
+        "]{"+  activePilots.size+ "} removed", pilotsToBeRemoved);
     console.log("Pilots to be added ("  + promisedPilots.size+ 
         ") added", pilotsToBeAdded);
 });
