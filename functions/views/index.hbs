@@ -23,10 +23,10 @@
       var update;
       var index;
       var listItem;
-      var timeStamp = "{{tranferData.timeStamp}}"
+      var timeStamp = "{{tranferData.timeStamp}}";
 
       // initial pilot list
-      {{#each tranferData.allPilots}}
+      {{#each tranferData.pilots}}
         listItem = document.createElement(LIST_TYPE);
         listItem.innerText = viewFormat({
           firstName: "{{{this.firstName}}}",
