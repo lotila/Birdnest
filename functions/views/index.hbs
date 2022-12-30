@@ -9,8 +9,9 @@
   <script>
     // data format for a row
     function viewFormat(pilot) {
-     return pilot.firstName + " " + pilot.lastName
-        + " " + pilot.email + " " + pilot.phoneNumber;
+     return "Name: " + pilot.firstName + " " + pilot.lastName
+        + " Email: " + pilot.email + " Phone number: " + pilot.phoneNumber 
+        + " Closest distance to nest: " + pilot.closestDistanceToNest + " mm";
     }
     // page is fully loaded
     document.addEventListener('DOMContentLoaded', function () 
@@ -32,7 +33,8 @@
           firstName: "{{{this.firstName}}}",
           lastName:  "{{{this.lastName}}}",
           email:  "{{{this.email}}}",
-          phoneNumber:  "{{{this.phoneNumber}}}"
+          phoneNumber:  "{{{this.phoneNumber}}}",
+          closestDistanceToNest: "{{{this.closestDistanceToNest}}}"
         });
         pilotList.appendChild(listItem);
       {{/each}}
@@ -50,14 +52,24 @@
           // get json
           response.json().then((update) =>
            {
-            // remove old pilots from list
-            update.removePilots.forEach((oldPilot) => {
-              for (index = 0; index < pilotListElements.length; index++) {
-                if ( viewFormat(oldPilot) == pilotListElements.item(index).innerHTML) {
-                  pilotListElements.item(index).remove();
+            if (update.TimeStampTimeOut)
+            {
+              // remove all pilots
+              for (index = 0; index < pilotListElements.length; index++) { 
+                pilotListElements.item(index).remove();
                 }
-              };
-            });
+            }
+            else {
+              // remove old pilots from list
+              update.removePilots.forEach((oldPilotEmail) => {
+                // go through rows if row has oldPilotEmail, delete row
+                for (index = 0; index < pilotListElements.length; index++) {
+                  if (-1 !== pilotListElements.item(index).innerHTML.search(oldPilotEmail)) {
+                    pilotListElements.item(index).remove();
+                  }
+                };
+              });
+            }
             // add new pilots to list
             update.addPilots.forEach((newPilot) => {
               listItem = document.createElement(LIST_TYPE);
