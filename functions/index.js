@@ -15,11 +15,11 @@ const ERROR = {
 };
 
 // remove pilots after 10 minutes (in milliseconds)
-const PILOT_TIME_OUT = 4*60*1000;
+const PILOT_TIME_OUT = 10*60*1000;
 
-// remove time stamps after 10 minutes (in milliseconds)
+// remove time stamps after 2 minutes (in milliseconds)
 // client doesn't have to be reload page if connection is lost for short period.
-const TIME_STAMP_TIME_OUT = 10*60*1000;
+const TIME_STAMP_TIME_OUT = 2*60*1000;
 
 // data update rate (in milliseconds)
 const UPDATE_TIME = 2000;
@@ -59,11 +59,6 @@ admin.initializeApp(functions.config().firebase);
 //    timeOfLastViolation:
 //}
 const activePilots = new Map();
-
-// flyZoneViolations stores timeOfLastViolation for activePilots
-// key = drone serial number
-// data = timeOfLastViolation
-const flyZoneViolations = new Map();
 
 // promisedPilots strores drone serial numbers while loading is in progress
 const promisedPilots = new Set();
@@ -129,28 +124,41 @@ function fetchDrones()
                 console.log("fetch drone:", droneSerialNumber);
 
                 // check if pilot is not already in activePilots
-                if(activePilots.has(droneSerialNumber)) {
-                    // update time
-                    flyZoneViolations.set(droneSerialNumber, timeOfLastViolation);
-
-                    // update activePilots
-                    const oldActivePilots = activePilots.get(droneSerialNumber);
-                    activePilots.set(droneSerialNumber, {
-                        firstName: oldActivePilots.firstName, 
-                        lastName: oldActivePilots.lastName,
-                        email: oldActivePilots.email,
-                        phoneNumber: oldActivePilots.phoneNumber,
-                        closestDistanceToNest: distanceToNest,
-                        timeOfLastViolation: timeOfLastViolation
-                    });
-
+                if(activePilots.has(droneSerialNumber)) 
+                {   // update activePilots
+                    const oldActivePilot = activePilots.get(droneSerialNumber);
+                    
+                    // if nest is closer 
+                    if(oldActivePilot.closestDistanceToNest > distanceToNest )
+                    {
+                        activePilots.set(droneSerialNumber, {
+                            firstName: oldActivePilot.firstName, 
+                            lastName: oldActivePilot.lastName,
+                            email: oldActivePilot.email,
+                            phoneNumber: oldActivePilot.phoneNumber,
+                            closestDistanceToNest: distanceToNest,
+                            timeOfLastViolation: timeOfLastViolation
+                        });
+                        // update client's list
+                        const newTimeStamp =  new Date().getTime();
+                        timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
+                        timeStampedPilots.set(droneSerialNumber, newTimeStamp);
+                    }
+                    else 
+                    {   // update time of violation
+                        activePilots.set(droneSerialNumber, {
+                            firstName: oldActivePilot.firstName, 
+                            lastName: oldActivePilot.lastName,
+                            email: oldActivePilot.email,
+                            phoneNumber: oldActivePilot.phoneNumber,
+                            closestDistanceToNest: oldActivePilot.closestDistanceToNest,
+                            timeOfLastViolation: timeOfLastViolation
+                        });
+                    }
                 }
                 else {
                     // add to promisedPilots
                     promisedPilots.add(droneSerialNumber);
-                    
-                    // add/update timeOfLastViolation
-                    flyZoneViolations.set(droneSerialNumber, timeOfLastViolation);
 
                     activePilots.set(droneSerialNumber, {
                         firstName: "qqqq", 
@@ -160,7 +168,6 @@ function fetchDrones()
                         closestDistanceToNest: distanceToNest,
                         timeOfLastViolation: timeOfLastViolation
                     });
-
                 }
             });
         });
@@ -186,8 +193,8 @@ function fetchPilot(droneSerialNumber)
             timeStampedPilots.set(droneSerialNumber, newTimeStamp);
 
             // update time stamp
-            if ( currentTimeStamp < newTimeStamp ) {currentTimeStamp = newTimeStamp; }
-
+            currentTimeStamp = newTimeStamp; 
+            
             // update activePilots
             const oldActivePilots = activePilots.get(droneSerialNumber);
             activePilots.set(droneSerialNumber, {
@@ -203,16 +210,10 @@ function fetchPilot(droneSerialNumber)
         });
     }).catch((error) => {
         console.log(ERROR.FETCH_PILOT, error);
-        // if less than 10 min old request
-        if (!isTimeOut(new Date(timeOfLastViolation).getTime(), PILOT_TIME_OUT)) {
+        // if younger than 10 min old pilot
+        if (!isTimeOut(new Date(activePilots.get(droneSerialNumber)).getTime(), PILOT_TIME_OUT)) {
             // pilot will be handled again in next interval
             promisedPilots.add(droneSerialNumber);
-            timeStampedPilots.delete(droneSerialNumber);
-        }
-        else { // forget pilot
-            activePilots.delete(droneSerialNumber);
-            flyZoneViolations.delete(droneSerialNumber);
-            timeStampedPilots.delete(droneSerialNumber);
         }
     });
 }
@@ -235,25 +236,20 @@ function removeOldPilots()
     })
 
     // compere last violation to PILOT_TIME_OUT
-    flyZoneViolations.forEach( (timeOfLastViolation, droneSerialNumber) => 
+    timeStampedPilots.forEach( (timeStamp, droneSerialNumber) => 
     {
-        if (isTimeOut(new Date(timeOfLastViolation).getTime(), PILOT_TIME_OUT))
+        // if timeOfLastViolation was over 10 min ago
+        if (isTimeOut(new Date(activePilots.get(droneSerialNumber).timeOfLastViolation).getTime(), PILOT_TIME_OUT))
         {
             // update timeStampedPilots 
-            timeStampedPilots.forEach((timeStamp, timeStampedDroneSerialNumber) => {
-                if (timeStampedDroneSerialNumber === droneSerialNumber){
-                    timeStampedPilots.delete(timeStampedDroneSerialNumber);
-                }
-            });
+            timeStampedPilots.delete(droneSerialNumber);
+
             // add to timeStampedOldPilots 
             const newTimeStamp =  new Date().getTime();
             timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
             
             // update current time stamp
-            if ( currentTimeStamp < newTimeStamp ) {currentTimeStamp = newTimeStamp; }
-
-            // remove from flyZoneViolations
-            flyZoneViolations.delete(droneSerialNumber);
+            currentTimeStamp = newTimeStamp;
         }
     });
 }
@@ -323,7 +319,7 @@ app.post('/api', (request, response) =>
         TimeStampTimeOut: TimeStampTimeOut
     });
     console.log("Pilots to be removed (" + timeStampedPilots.size + 
-        ")(" + flyZoneViolations.size +")[" + timeStampedOldPilots.size + 
+        ")[" + timeStampedOldPilots.size + 
         "]{"+  activePilots.size+ "} removed", pilotsToBeRemoved);
     console.log("Pilots to be added ("  + promisedPilots.size+ 
         ") added", pilotsToBeAdded);
