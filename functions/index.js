@@ -73,11 +73,8 @@ const timeStampedPilots = new Map();
 // data = time stamp
 const timeStampedOldPilots = new Map();
 
-// time is updates, when activePilots chenges
+// time stamp is updated when pilots are added or removed
 var currentTimeStamp = 0;
-
-var latestTimeStamp = 0;
-
 
 // check for fly zone violation
 function getDistanceToNest(dronePosX, dronePosY) 
@@ -130,7 +127,7 @@ function fetchDrones()
                     
                     // if nest is closer 
                     if(oldActivePilot.closestDistanceToNest > distanceToNest )
-                    {
+                    {   // update time of violation and closest distance to nest
                         activePilots.set(droneSerialNumber, {
                             firstName: oldActivePilot.firstName, 
                             lastName: oldActivePilot.lastName,
@@ -139,10 +136,16 @@ function fetchDrones()
                             closestDistanceToNest: distanceToNest,
                             timeOfLastViolation: timeOfLastViolation
                         });
-                        // update client's list
-                        const newTimeStamp =  new Date().getTime();
-                        timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
-                        timeStampedPilots.set(droneSerialNumber, newTimeStamp);
+                        // if pilot is not in queue to be processed
+                        if (!promisedPilots.has(droneSerialNumber))
+                        {
+                            // update client's list
+                            const newTimeStamp =  new Date().getTime();
+                            timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
+                            timeStampedPilots.set(droneSerialNumber, newTimeStamp);
+                            // update time stamp
+                            currentTimeStamp = newTimeStamp;
+                        } 
                     }
                     else 
                     {   // update time of violation
@@ -161,10 +164,6 @@ function fetchDrones()
                     promisedPilots.add(droneSerialNumber);
 
                     activePilots.set(droneSerialNumber, {
-                        firstName: "qqqq", 
-                        lastName: "qqqq",
-                        email: "qqqq",
-                        phoneNumber: "qqqq",
                         closestDistanceToNest: distanceToNest,
                         timeOfLastViolation: timeOfLastViolation
                     });
@@ -260,12 +259,11 @@ app.get('/', (request,response) =>
     // get all pilots for client
     const pilotsToBeAdded = [];
     timeStampedPilots.forEach((timeStamp, droneSerialNumber) => {
-        if ( latestTimeStamp < timeStamp ) {latestTimeStamp = timeStamp; }
         pilotsToBeAdded.push(activePilots.get(droneSerialNumber));
     });
     const tranferData = {
         pilots: pilotsToBeAdded,
-        timeStamp: latestTimeStamp
+        timeStamp: currentTimeStamp
     }
     // send data
     response.render('index',{tranferData});
@@ -285,7 +283,6 @@ app.post('/api', (request, response) =>
     {
         // get all pilots for client
         timeStampedPilots.forEach((timeStamp, droneSerialNumber) => {
-            if ( latestTimeStamp < timeStamp ) {latestTimeStamp = timeStamp; }
             pilotsToBeAdded.push(activePilots.get(droneSerialNumber));
         });
     }
@@ -296,8 +293,6 @@ app.post('/api', (request, response) =>
             if (clientTimeStamp < timeStamp) 
             {
                 pilotsToBeAdded.push(activePilots.get(droneSerialNumber));
-
-                if ( latestTimeStamp < timeStamp ) {latestTimeStamp = timeStamp; }
             }
         });
         // get pilots that should be deleted from client
@@ -305,8 +300,6 @@ app.post('/api', (request, response) =>
             if (clientTimeStamp < timeStamp) 
             {
                 pilotsToBeRemoved.push(activePilots.get(droneSerialNumber).email);
-
-                if ( latestTimeStamp < timeStamp ) {latestTimeStamp = timeStamp; }
             }
         });
     }
@@ -315,7 +308,7 @@ app.post('/api', (request, response) =>
     response.json({
         addPilots: pilotsToBeAdded,
         removePilots: pilotsToBeRemoved,
-        timeStamp: latestTimeStamp,
+        timeStamp: currentTimeStamp,
         TimeStampTimeOut: TimeStampTimeOut
     });
     console.log("Pilots to be removed (" + timeStampedPilots.size + 
@@ -340,8 +333,6 @@ setInterval( function ()
 
     console.log("loop run");
 },UPDATE_TIME);
-
-
 
 
 exports.app = functions.https.onRequest(app);
