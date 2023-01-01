@@ -1,28 +1,3 @@
-const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
-const URL_PILOT_INFO = "https://assignments.reaktor.com/birdnest/pilots/";
-
-// nest zone (in millimeters)
-const NESTZONE = {
-    POSX: 250000,
-    POSY: 250000,
-    RADIOUS: 100000
-};
-
-// error codes
-const ERROR = {
-    FETCH_PILOT: "ERROR: Fetch pilot info error",
-    FETCH_DRONES: "ERROR: Fetch drone positions error",
-};
-
-// remove pilots after 10 minutes (in milliseconds)
-const PILOT_TIME_OUT = 10*60*1000;
-
-// remove time stamps after 2 minutes (in milliseconds)
-// client doesn't have to be reload page if connection is lost for short period.
-const TIME_STAMP_TIME_OUT = 2*60*1000;
-
-// data update rate (in milliseconds)
-const UPDATE_TIME = 2000;
 
 // xml to json 
 const { parseString } = require("xml2js");
@@ -47,6 +22,42 @@ app.use(express.json({ limit: '1mb' }));
 
 // init firebase web hosting
 admin.initializeApp(functions.config().firebase);
+
+
+const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
+const URL_PILOT_INFO = "https://assignments.reaktor.com/birdnest/pilots/";
+
+// nest zone (in millimeters)
+const NESTZONE = {
+    POSX: 250000,
+    POSY: 250000,
+    RADIOUS: 100000
+};
+
+// error codes
+const ERROR = {
+    FETCH_PILOT: "ERROR: Fetch pilot info error",
+    FETCH_DRONES: "ERROR: Fetch drone positions error",
+};
+
+// data update rate (in milliseconds)
+const UPDATE_TIME = 2000;
+
+// remove pilots after 10 minutes (in milliseconds)
+const PILOT_TIME_OUT = 10*60*1000;
+
+// remove time stamps after 2 minutes (in milliseconds)
+// client doesn't have to be reload page if connection is lost for short period.
+const TIME_STAMP_TIME_OUT = 2*60*1000;
+
+// time stamp is updated when pilots are added or removed
+var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
+
+// stop fetching drones if client has not been active (in milliseconds)
+const CLIENT_TIME_OUT = 11*60*1000;
+
+// last time client requested time (in milliseconds)
+var lastClientRequestTime = currentTimeStamp;
 
 // activePilots stores pilot info
 // key = drone serial number
@@ -73,9 +84,6 @@ const timeStampedPilots = new Map();
 // data = time stamp
 const timeStampedOldPilots = new Map();
 
-// time stamp is updated when pilots are added or removed
-var currentTimeStamp = 0;
-
 // check for fly zone violation
 function getDistanceToNest(dronePosX, dronePosY) 
 {
@@ -84,7 +92,7 @@ function getDistanceToNest(dronePosX, dronePosY)
         Math.pow(dronePosY - NESTZONE.POSY, 2))
 }
 
-// return true if timeOut has passed since time
+// return true if timeOut time has passed since time
 function isTimeOut(time, timeOut)
 {
     // time currently minus time is larger than time out
@@ -112,10 +120,11 @@ function fetchDrones()
             // get time 
             const timeOfLastViolation = dronesInJsonFile.report.capture[0]['$'].snapshotTimestamp;
             var droneSerialNumber;
+            var distanceToNest;
             droneList.forEach( (newDrone) => 
             {
                 droneSerialNumber = newDrone.serialNumber[0];
-                const distanceToNest = getDistanceToNest(newDrone.positionX[0], newDrone.positionY[0]);
+                distanceToNest = getDistanceToNest(newDrone.positionX[0], newDrone.positionY[0]);
                 // if dorne is not inside nest zone, don't fetch pilot info
                 if (NESTZONE.RADIOUS < distanceToNest)  { return; }
                 console.log("fetch drone:", droneSerialNumber);
@@ -139,12 +148,10 @@ function fetchDrones()
                         // if pilot is not in queue to be processed
                         if (!promisedPilots.has(droneSerialNumber))
                         {
-                            // update client's list
-                            const newTimeStamp =  new Date().getTime();
-                            timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
-                            timeStampedPilots.set(droneSerialNumber, newTimeStamp);
-                            // update time stamp
-                            currentTimeStamp = newTimeStamp;
+                            // update client's list and update time stamp
+                            currentTimeStamp =  new Date().getTime();
+                            timeStampedOldPilots.set(droneSerialNumber, currentTimeStamp);
+                            timeStampedPilots.set(droneSerialNumber, currentTimeStamp);
                         } 
                     }
                     else 
@@ -169,11 +176,19 @@ function fetchDrones()
                     });
                 }
             });
-        });
-    }).catch((error) => {
-        console.log(ERROR.FETCH_DRONES, error);
-    });
+        }).catch((error) =>  console.log(ERROR.FETCH_DRONES, error));
+    }).catch((error) => console.log(ERROR.FETCH_DRONES, error));
  }
+
+ function handlePilotError(droneSerialNumber, error) 
+{
+    console.log(ERROR.FETCH_PILOT, error);
+        // if younger than 10 min old pilot
+        if (!isTimeOut(new Date(activePilots.get(droneSerialNumber)).getTime(), PILOT_TIME_OUT)) {
+            // pilot will be handled again in next interval
+            promisedPilots.add(droneSerialNumber);
+        }
+}
 
 // when promise settles, add pilot to  list 
 function fetchPilot(droneSerialNumber) 
@@ -187,12 +202,9 @@ function fetchPilot(droneSerialNumber)
         // get json
         pilotResponse.json().then((pilotInfo) => 
         {
-            // add to timeStamped list
-            const newTimeStamp =  new Date().getTime();
-            timeStampedPilots.set(droneSerialNumber, newTimeStamp);
-
-            // update time stamp
-            currentTimeStamp = newTimeStamp; 
+            // add to timeStamped list and update time stamp
+            currentTimeStamp =  new Date().getTime();
+            timeStampedPilots.set(droneSerialNumber, currentTimeStamp);
             
             // update activePilots
             const oldActivePilots = activePilots.get(droneSerialNumber);
@@ -205,16 +217,9 @@ function fetchPilot(droneSerialNumber)
                 timeOfLastViolation: oldActivePilots.timeOfLastViolation
             });
 
-            console.log("fetched drone:", droneSerialNumber);
-        });
-    }).catch((error) => {
-        console.log(ERROR.FETCH_PILOT, error);
-        // if younger than 10 min old pilot
-        if (!isTimeOut(new Date(activePilots.get(droneSerialNumber)).getTime(), PILOT_TIME_OUT)) {
-            // pilot will be handled again in next interval
-            promisedPilots.add(droneSerialNumber);
-        }
-    });
+            console.log("add drone:", droneSerialNumber);
+        }).catch((error) => handlePilotError(droneSerialNumber, error) );
+    }).catch((error) => handlePilotError(droneSerialNumber, error) );
 }
 function removeOldPilots() 
 {
@@ -243,12 +248,9 @@ function removeOldPilots()
             // update timeStampedPilots 
             timeStampedPilots.delete(droneSerialNumber);
 
-            // add to timeStampedOldPilots 
-            const newTimeStamp =  new Date().getTime();
-            timeStampedOldPilots.set(droneSerialNumber, newTimeStamp);
-            
-            // update current time stamp
-            currentTimeStamp = newTimeStamp;
+            // add to timeStampedOldPilots and update current time stamp
+            currentTimeStamp =  new Date().getTime();
+            timeStampedOldPilots.set(droneSerialNumber, currentTimeStamp);
         }
     });
 }
@@ -267,8 +269,10 @@ app.get('/', (request,response) =>
     }
     // send data
     response.render('index',{tranferData});
+    // update client activity
+    lastClientRequestTime = currentTimeStamp;
 
-    console.log("Add pilots >>>>>>", tranferData.pilots)
+    console.log("Add pilots:", tranferData.pilots)
 });
 
 // get time stamp from client, update client's pilot list and send new time stamp
@@ -303,7 +307,6 @@ app.post('/api', (request, response) =>
             }
         });
     }
-    
     // send data
     response.json({
         addPilots: pilotsToBeAdded,
@@ -311,6 +314,9 @@ app.post('/api', (request, response) =>
         timeStamp: currentTimeStamp,
         TimeStampTimeOut: TimeStampTimeOut
     });
+    // update client activity
+    lastClientRequestTime = currentTimeStamp;
+
     console.log("Pilots to be removed (" + timeStampedPilots.size + 
         ")[" + timeStampedOldPilots.size + 
         "]{"+  activePilots.size+ "} removed", pilotsToBeRemoved);
@@ -321,17 +327,27 @@ app.post('/api', (request, response) =>
 // fetch data every 2 seconds
 setInterval( function () 
 {
-    // activate fetch promises for pilots
-    promisedPilots.forEach((droneSerialNumber) => fetchPilot(droneSerialNumber));
-
-    // fetch drone positions and drone serial numbers
-    // if violated NDC add them to promisedPilots
-    fetchDrones();
-
-    // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
-    removeOldPilots();
-
     console.log("loop run");
+    // if clients are offline, skip all
+    if (isTimeOut(lastClientRequestTime, CLIENT_TIME_OUT)) { 
+        // clear memory
+        promisedPilots.clear();
+        activePilots.clear();
+        timeStampedPilots.clear();
+        timeStampedOldPilots.clear()
+        return;
+    }
+    else {
+        // activate fetch promises for pilots
+        promisedPilots.forEach((droneSerialNumber) => fetchPilot(droneSerialNumber));
+
+        // fetch drone positions and drone serial numbers
+        // if violated NDC add them to promisedPilots
+        fetchDrones();
+
+        // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
+        removeOldPilots();
+    }
 },UPDATE_TIME);
 
 
