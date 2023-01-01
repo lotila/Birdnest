@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <body>
+    <fieldset>
+      <legend>Drone fly zone violations</legend>
+         <table id="pilotList"></table>
+    </fieldset>
+  </body>
+  <script>
+    const pilotList = document.getElementById("pilotList");
+    const UPDATE_TIME = 2000;
+    var timeStamp = "{{tranferData.timeStamp}}";
+    var row;
+    // data format for a row
+    function addRow(pilot) {
+        row = pilotList.insertRow();
+        row.insertCell(0).innerHTML = pilot.firstName;
+        row.insertCell(1).innerHTML = pilot.lastName;
+        row.insertCell(2).innerHTML = pilot.email;
+        row.insertCell(3).innerHTML = pilot.phoneNumber;
+        row.insertCell(4).innerHTML = pilot.closestDistanceToNest;
+    }
+    // page is fully loaded
+    document.addEventListener('DOMContentLoaded', function () 
+    { 
+      // add pilot list headers
+        addRow({
+          firstName: "First name",
+          lastName:  "Last name",
+          email:  "Email",
+          phoneNumber:  "Phone number",
+          closestDistanceToNest: "Closest distance to nest (mm)"
+        });
+        addRow({
+          firstName: "__________",
+          lastName:  "___________",
+          email:  "______________________________",
+          phoneNumber:  "_______________",
+          closestDistanceToNest: "_________________________"
+        });
+
+      // initial pilot list
+      {{#each tranferData.pilots}}
+        addRow({
+          firstName: "{{{this.firstName}}}",
+          lastName:  "{{{this.lastName}}}",
+          email:  "{{{this.email}}}",
+          phoneNumber:  "{{{this.phoneNumber}}}",
+          closestDistanceToNest: "{{{this.closestDistanceToNest}}}"
+        });
+      {{/each}}
+
+      // reguest data from server every 2 seconds
+      setInterval( function () 
+      {
+        // request data
+        fetch('/api', {
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
+          body: timeStamp
+        }).then((response) => 
+        {
+          // get json
+          response.json().then((update) =>
+           {
+            if (update.TimeStampTimeOut)
+            {
+              // remove all pilots
+              for (rowIndex = pilotList.rows.length - 1; rowIndex > 1; rowIndex--) { 
+                pilotList.rows[rowIndex].remove();
+                }
+            }
+            else {
+              // remove old pilots from list
+              update.removePilots.forEach((oldPilotEmail) => {
+                // go through rows if row has oldPilotEmail, delete row
+                for (rowIndex = pilotList.rows.length - 1; rowIndex > 1; rowIndex--) {
+                  if (oldPilotEmail === pilotList.rows[rowIndex].cells[2].innerHTML) {
+                    pilotList.rows[rowIndex].remove();
+                  }
+                };
+              });
+            }
+            // add new pilots to list
+            update.addPilots.forEach((newPilot) => { addRow(newPilot); });
+             
+            // update timeStamp
+            timeStamp = update.timeStamp;
+
+          }).catch((error) => console.log(error));
+        }).catch((error) => console.log(error));
+      },UPDATE_TIME);
+  });
+  </script>
+</html>

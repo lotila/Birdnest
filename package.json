@@ -1,0 +1,19 @@
+{
+  "name": "birdnest",
+  "version": "1.0.0",
+  "description": "Drone tracking for fly zone violations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lotila/Birdnest.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lotila/Birdnest/issues"
+  },
+  "homepage": "https://github.com/lotila/Birdnest#readme"
+}
