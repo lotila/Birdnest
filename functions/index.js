@@ -54,7 +54,7 @@ const TIME_STAMP_TIME_OUT = 2*60*1000;
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
 
 // stop fetching drones if client has not been active (in milliseconds)
-const CLIENT_TIME_OUT = 11*60*1000;
+const CLIENT_TIME_OUT = 20*60*1000;
 
 // last time client requested time (in milliseconds)
 var lastClientRequestTime = currentTimeStamp;
@@ -176,18 +176,20 @@ function fetchDrones()
                     });
                 }
             });
+        // if error, fetch drones in next interval
         }).catch((error) =>  console.log(ERROR.FETCH_DRONES, error));
     }).catch((error) => console.log(ERROR.FETCH_DRONES, error));
  }
 
+ // if error fetching pilot, fetch it in next interval
  function handlePilotError(droneSerialNumber, error) 
 {
     console.log(ERROR.FETCH_PILOT, error);
-        // if younger than 10 min old pilot
-        if (!isTimeOut(new Date(activePilots.get(droneSerialNumber)).getTime(), PILOT_TIME_OUT)) {
-            // pilot will be handled again in next interval
-            promisedPilots.add(droneSerialNumber);
-        }
+    // if younger than 10 min old pilot
+    if (!isTimeOut(new Date(activePilots.get(droneSerialNumber)).getTime(), PILOT_TIME_OUT)) {
+        // pilot will be handled again in next interval
+        promisedPilots.add(droneSerialNumber);
+    }
 }
 
 // when promise settles, add pilot to  list 
@@ -216,8 +218,8 @@ function fetchPilot(droneSerialNumber)
                 closestDistanceToNest: oldActivePilots.closestDistanceToNest,
                 timeOfLastViolation: oldActivePilots.timeOfLastViolation
             });
-
             console.log("add drone:", droneSerialNumber);
+
         }).catch((error) => handlePilotError(droneSerialNumber, error) );
     }).catch((error) => handlePilotError(droneSerialNumber, error) );
 }
@@ -255,13 +257,25 @@ function removeOldPilots()
     });
 }
 
-// initial web request
+// give client only names, email, phone number and distance to nest
+function getPilotForClient(pilot) 
+{
+    return {
+        firstName: pilot.firstName,
+        lastName: pilot.lastName,
+        email: pilot.email,
+        phoneNumber: pilot.phoneNumber,
+        closestDistanceToNest: pilot.closestDistanceToNest
+    };
+}
+
+// client's initial web request
 app.get('/', (request,response) =>
 {
     // get all pilots for client
     const pilotsToBeAdded = [];
     timeStampedPilots.forEach((timeStamp, droneSerialNumber) => {
-        pilotsToBeAdded.push(activePilots.get(droneSerialNumber));
+        pilotsToBeAdded.push(getPilotForClient(activePilots.get(droneSerialNumber)));
     });
     const tranferData = {
         pilots: pilotsToBeAdded,
@@ -296,7 +310,7 @@ app.post('/api', (request, response) =>
         timeStampedPilots.forEach((timeStamp, droneSerialNumber) => {
             if (clientTimeStamp < timeStamp) 
             {
-                pilotsToBeAdded.push(activePilots.get(droneSerialNumber));
+                pilotsToBeAdded.push(getPilotForClient(activePilots.get(droneSerialNumber)));
             }
         });
         // get pilots that should be deleted from client
@@ -337,19 +351,18 @@ setInterval( function ()
         timeStampedOldPilots.clear()
         return;
     }
-    else {
-        // activate fetch promises for pilots
-        promisedPilots.forEach((droneSerialNumber) => fetchPilot(droneSerialNumber));
+    // activate fetch promises for pilots
+    promisedPilots.forEach((droneSerialNumber) => fetchPilot(droneSerialNumber));
 
-        // fetch drone positions and drone serial numbers
-        // if violated NDC add them to promisedPilots
-        fetchDrones();
+    // fetch drone positions and drone serial numbers
+    // if violated NDC add them to promisedPilots
+    fetchDrones();
 
-        // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
-        removeOldPilots();
-    }
+    // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
+    removeOldPilots();
+
 },UPDATE_TIME);
 
-
+// deploy https
 exports.app = functions.https.onRequest(app);
 

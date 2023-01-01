@@ -14,12 +14,11 @@
     // data format for a row
     function addRow(pilot) {
         row = pilotList.insertRow();
-        row.insertCell(0).innerHTML = pilot.timeOfLastViolation;
-        row.insertCell(1).innerHTML = pilot.firstName;
-        row.insertCell(2).innerHTML = pilot.lastName;
-        row.insertCell(3).innerHTML = pilot.email;
-        row.insertCell(4).innerHTML = pilot.phoneNumber;
-        row.insertCell(5).innerHTML = pilot.closestDistanceToNest;
+        row.insertCell(0).innerHTML = pilot.firstName;
+        row.insertCell(1).innerHTML = pilot.lastName;
+        row.insertCell(2).innerHTML = pilot.email;
+        row.insertCell(3).innerHTML = pilot.phoneNumber;
+        row.insertCell(4).innerHTML = pilot.closestDistanceToNest;
     }
     // page is fully loaded
     document.addEventListener('DOMContentLoaded', function () 
@@ -30,16 +29,14 @@
           lastName:  "Last name",
           email:  "Email",
           phoneNumber:  "Phone number",
-          closestDistanceToNest: "Closest distance to nest (mm)",
-          timeOfLastViolation: "timeOfLastViolation"
+          closestDistanceToNest: "Closest distance to nest (mm)"
         });
         addRow({
           firstName: "__________",
-          lastName:  "__________",
+          lastName:  "___________",
           email:  "______________________________",
           phoneNumber:  "_______________",
-          closestDistanceToNest: "_________________________",
-          timeOfLastViolation: "______________________________"
+          closestDistanceToNest: "_________________________"
         });
 
       // initial pilot list
@@ -49,8 +46,7 @@
           lastName:  "{{{this.lastName}}}",
           email:  "{{{this.email}}}",
           phoneNumber:  "{{{this.phoneNumber}}}",
-          closestDistanceToNest: "{{{this.closestDistanceToNest}}}",
-          timeOfLastViolation: "{{{this.timeOfLastViolation}}}"
+          closestDistanceToNest: "{{{this.closestDistanceToNest}}}"
         });
       {{/each}}
 
@@ -79,7 +75,7 @@
               update.removePilots.forEach((oldPilotEmail) => {
                 // go through rows if row has oldPilotEmail, delete row
                 for (rowIndex = pilotList.rows.length - 1; rowIndex > 1; rowIndex--) {
-                  if (oldPilotEmail == pilotList.rows[rowIndex].cells[3].innerHTML) {
+                  if (oldPilotEmail === pilotList.rows[rowIndex].cells[2].innerHTML) {
                     pilotList.rows[rowIndex].remove();
                   }
                 };
@@ -91,7 +87,6 @@
             // update timeStamp
             timeStamp = update.timeStamp;
 
-            console.log(pilotList.rows.length - 2);
           }).catch((error) => console.log(error));
         }).catch((error) => console.log(error));
       },UPDATE_TIME);
