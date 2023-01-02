@@ -23,7 +23,7 @@ app.use(express.json({ limit: '1mb' }));
 // init firebase web hosting
 admin.initializeApp(functions.config().firebase);
 
-
+// links for drone and pilot data
 const URL_DRONE_POSITIONS = "https://assignments.reaktor.com/birdnest/drones";
 const URL_PILOT_INFO = "https://assignments.reaktor.com/birdnest/pilots/";
 
@@ -40,26 +40,26 @@ const ERROR = {
     FETCH_DRONES: "ERROR: Fetch drone positions error",
 };
 
-// data update rate (in milliseconds)
+// data update time (in milliseconds)
 const UPDATE_TIME = 2000;
 
 // remove pilots after 10 minutes (in milliseconds)
 const PILOT_TIME_OUT = 10*60*1000;
 
 // remove time stamps after 2 minutes (in milliseconds)
-// client doesn't have to be reload page if connection is lost for short period.
+// client doesn't have to reload the page if connection is lost for short period.
 const TIME_STAMP_TIME_OUT = 2*60*1000;
 
-// time stamp is updated when pilots are added or removed
+// current time stamp is updated when pilots are added or removed
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
 
-// stop fetching drones if client has not been active (in milliseconds)
+// save resources if client has been offline last 20 minutes (in milliseconds)
 const CLIENT_TIME_OUT = 20*60*1000;
 
-// last time client requested time (in milliseconds)
+// last time client requested pilot data (in milliseconds)
 var lastClientRequestTime = currentTimeStamp;
 
-// activePilots stores pilot info
+// activePilots stores pilot data
 // key = drone serial number
 // data = {
 //    firstName:
@@ -84,7 +84,7 @@ const timeStampedPilots = new Map();
 // data = time stamp
 const timeStampedOldPilots = new Map();
 
-// check for fly zone violation
+// get distance to nest
 function getDistanceToNest(dronePosX, dronePosY) 
 {
     return Math.sqrt(
@@ -92,14 +92,14 @@ function getDistanceToNest(dronePosX, dronePosY)
         Math.pow(dronePosY - NESTZONE.POSY, 2))
 }
 
-// return true if timeOut time has passed since time
+// return true if time Out
 function isTimeOut(time, timeOut)
 {
-    // time currently minus time is larger than time out
+    // current time minus time is larger than time out
     return (new Date().getTime() - time > timeOut);
 }
 
-// fetch drone positions and pilots to activePilots list
+// fetch drones, and add new drone serial numbers to promisedPilots 
 function fetchDrones()
 {
     // fetch drone postions data
@@ -192,7 +192,7 @@ function fetchDrones()
     }
 }
 
-// when promise settles, add pilot to  list 
+// fetch pilot and add it to activePilots list and timeStampedPilots list
 function fetchPilot(droneSerialNumber) 
 {
     promisedPilots.delete(droneSerialNumber);
@@ -223,11 +223,14 @@ function fetchPilot(droneSerialNumber)
         }).catch((error) => handlePilotError(droneSerialNumber, error) );
     }).catch((error) => handlePilotError(droneSerialNumber, error) );
 }
+
+// remove old pilots form time stamped lists and activePilots list
 function removeOldPilots() 
 {
     // remove old timeStamps
     timeStampedOldPilots.forEach((timeStamp, droneSerialNumber) => 
     {
+        // check if pilot is older than TIME_STAMP_TIME_OUT + PILOT_TIME_OUT
         if (isTimeOut(new Date(activePilots.get(droneSerialNumber).timeOfLastViolation).getTime(), 
             TIME_STAMP_TIME_OUT + PILOT_TIME_OUT))
         {
@@ -241,7 +244,7 @@ function removeOldPilots()
         }
     })
 
-    // compere last violation to PILOT_TIME_OUT
+    // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
     timeStampedPilots.forEach( (timeStamp, droneSerialNumber) => 
     {
         // if timeOfLastViolation was over 10 min ago
@@ -289,7 +292,7 @@ app.get('/', (request,response) =>
     console.log("Add pilots:", tranferData.pilots)
 });
 
-// get time stamp from client, update client's pilot list and send new time stamp
+// get time stamp from client, update client's pilot list and give new time stamp
 app.post('/api', (request, response) => 
 {
     const pilotsToBeAdded = [];
@@ -358,7 +361,7 @@ setInterval( function ()
     // if violated NDC add them to promisedPilots
     fetchDrones();
 
-    // remove 10 min old pilots from timeStampedPilots and add them to timeStampedOldPilots list
+    // remove old pilots
     removeOldPilots();
 
 },UPDATE_TIME);
