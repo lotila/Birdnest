@@ -53,8 +53,8 @@ const TIME_STAMP_TIME_OUT = 2*60*1000;
 // current time stamp is updated when pilots are added or removed
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
 
-// save resources if client has been offline last 20 minutes (in milliseconds)
-const CLIENT_TIME_OUT = 20*60*1000;
+// save resources if client has been offline last 8 hours (in milliseconds)
+const CLIENT_TIME_OUT = 8*60*60*1000;
 
 // last time client requested pilot data (in milliseconds)
 var lastClientRequestTime = currentTimeStamp;
