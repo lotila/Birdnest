@@ -145,12 +145,12 @@ function fetchDrones()
                             closestDistanceToNest: distanceToNest,
                             timeOfLastViolation: timeOfLastViolation
                         });
-                        // if pilot is not in queue to be processed
-                        if (!promisedPilots.has(droneSerialNumber))
+                        // if pilot is already in client's list
+                        if (timeStampedPilots.has(droneSerialNumber))
                         {
-                            // update client's list and update time stamp
+                            // update current time stamp
                             currentTimeStamp =  new Date().getTime();
-                            timeStampedOldPilots.set(droneSerialNumber, currentTimeStamp);
+                            // update client's list 
                             timeStampedPilots.set(droneSerialNumber, currentTimeStamp);
                         } 
                     }
@@ -204,10 +204,14 @@ function fetchPilot(droneSerialNumber)
         // get json
         pilotResponse.json().then((pilotInfo) => 
         {
-            // add to timeStamped list and update time stamp
+            // check for error
+            if (pilotInfo.firstName === undefined) {
+            throw "pilot name is undefined";
+            }
+            // update current time stamp
             currentTimeStamp =  new Date().getTime();
+            // add to timeStamped list
             timeStampedPilots.set(droneSerialNumber, currentTimeStamp);
-            
             // update activePilots
             const oldActivePilots = activePilots.get(droneSerialNumber);
             activePilots.set(droneSerialNumber, {
@@ -253,8 +257,9 @@ function removeOldPilots()
             // update timeStampedPilots 
             timeStampedPilots.delete(droneSerialNumber);
 
-            // add to timeStampedOldPilots and update current time stamp
+            // update current time stamp
             currentTimeStamp =  new Date().getTime();
+            // add to timeStampedOldPilots
             timeStampedOldPilots.set(droneSerialNumber, currentTimeStamp);
         }
     });
@@ -352,6 +357,7 @@ setInterval( function ()
         activePilots.clear();
         timeStampedPilots.clear();
         timeStampedOldPilots.clear()
+        console.log
         return;
     }
     // activate fetch promises for pilots
