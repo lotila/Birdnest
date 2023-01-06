@@ -82,7 +82,17 @@
               });
             }
             // add new pilots to list
-            update.addPilots.forEach((newPilot) => { addRow(newPilot); });
+            var alreadyListed;
+            update.addPilots.forEach((newPilot) => 
+            { 
+              // go through rows if row has oldPilotEmail, delete row
+              for (rowIndex = pilotList.rows.length - 1; rowIndex > 1; rowIndex--) {
+                if (newPilot.email === pilotList.rows[rowIndex].cells[2].innerHTML) {
+                  pilotList.rows[rowIndex].remove();
+                }
+              };
+              addRow(newPilot); 
+            });
              
             // update timeStamp
             timeStamp = update.timeStamp;
