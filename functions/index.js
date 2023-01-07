@@ -158,6 +158,7 @@ function fetchDrones()
                             timeOfLastViolation: timeOfLastViolation
                         });
                     }
+                    console.log("update drone:", droneSerialNumber);
                 }
                 else {
                     // add to promisedPilots
@@ -168,6 +169,8 @@ function fetchDrones()
                         closestDistanceToNest: distanceToNest,
                         timeOfLastViolation: timeOfLastViolation
                     });
+
+                    console.log("add drone:", droneSerialNumber);
                 }
             });
         // if error, fetch drones in next interval
@@ -216,8 +219,6 @@ function fetchPilot(droneSerialNumber)
                 closestDistanceToNest: oldActivePilots.closestDistanceToNest,
                 timeOfLastViolation: oldActivePilots.timeOfLastViolation
             });
-            console.log("add drone:", droneSerialNumber);
-
         }).catch((error) => handlePilotError(droneSerialNumber, error) );
     }).catch((error) => handlePilotError(droneSerialNumber, error) );
 }
