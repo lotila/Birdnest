@@ -2,7 +2,7 @@
 // xml to json 
 const { parseString } = require("xml2js");
 
-// server-client connection
+// web application framework
 const express = require('express');
 
 // firebase as web hosting provider
@@ -47,14 +47,11 @@ const UPDATE_TIME = 2000;
 const PILOT_TIME_OUT = 10*60*1000;
 
 // remove time stamps after 2 minutes (in milliseconds)
-// client doesn't have to reload the page if connection is lost for short period.
+// client doesn't have to reload the whole pilot list if connection is lost for short period.
 const TIME_STAMP_TIME_OUT = 2*60*1000;
 
 // current time stamp is updated when pilots are added or removed
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
-
-// save resources if client has been offline last 8 hours (in milliseconds)
-const CLIENT_TIME_OUT = 8*60*60*1000;
 
 // last time client requested pilot data (in milliseconds)
 var lastClientRequestTime = currentTimeStamp;
@@ -152,7 +149,7 @@ function fetchDrones()
                             currentTimeStamp =  new Date().getTime();
                             // update client's list 
                             timeStampedPilots.set(droneSerialNumber, currentTimeStamp);
-                        } 
+                        } // else, pilot is in promisedPilots list
                     }
                     else 
                     {   // update time of violation
@@ -206,7 +203,7 @@ function fetchPilot(droneSerialNumber)
         {
             // check for error
             if (pilotInfo.firstName === undefined) {
-            throw "pilot name is undefined";
+                throw "pilot name is undefined";
             }
             // update current time stamp
             currentTimeStamp =  new Date().getTime();
@@ -350,16 +347,7 @@ app.post('/api', (request, response) =>
 setInterval( function () 
 {
     console.log("loop run");
-    // if clients are offline, skip all
-    if (isTimeOut(lastClientRequestTime, CLIENT_TIME_OUT)) { 
-        // clear memory
-        promisedPilots.clear();
-        activePilots.clear();
-        timeStampedPilots.clear();
-        timeStampedOldPilots.clear()
-        console.log
-        return;
-    }
+
     // activate fetch promises for pilots
     promisedPilots.forEach((droneSerialNumber) => fetchPilot(droneSerialNumber));
 
@@ -367,7 +355,7 @@ setInterval( function ()
     // if violated NDC add them to promisedPilots
     fetchDrones();
 
-    // remove old pilots
+    // remove old time stamps and old pilots
     removeOldPilots();
 
 },UPDATE_TIME);
