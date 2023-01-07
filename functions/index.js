@@ -41,7 +41,7 @@ const ERROR = {
 };
 
 // data update time (in milliseconds)
-const UPDATE_TIME = 1500;
+const UPDATE_TIME = 990;
 
 // remove pilots after 10 minutes (in milliseconds)
 const PILOT_TIME_OUT = 10*60*1000;
@@ -121,7 +121,6 @@ function fetchDrones()
                 distanceToNest = getDistanceToNest(newDrone.positionX[0], newDrone.positionY[0]);
                 // if dorne is not inside nest zone, don't fetch pilot info
                 if (NESTZONE.RADIOUS < distanceToNest)  { return; }
-                console.log("fetch drone:", droneSerialNumber);
 
                 // check if pilot is not already in activePilots
                 if(activePilots.has(droneSerialNumber)) 
