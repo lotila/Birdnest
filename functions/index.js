@@ -41,7 +41,7 @@ const ERROR = {
 };
 
 // data update time (in milliseconds)
-const UPDATE_TIME = 2000;
+const UPDATE_TIME = 1500;
 
 // remove pilots after 10 minutes (in milliseconds)
 const PILOT_TIME_OUT = 10*60*1000;
@@ -52,9 +52,6 @@ const TIME_STAMP_TIME_OUT = 2*60*1000;
 
 // current time stamp is updated when pilots are added or removed
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
-
-// last time client requested pilot data (in milliseconds)
-var lastClientRequestTime = currentTimeStamp;
 
 // activePilots stores pilot data
 // key = drone serial number
@@ -167,6 +164,7 @@ function fetchDrones()
                     // add to promisedPilots
                     promisedPilots.add(droneSerialNumber);
 
+                    // create new active pilot
                     activePilots.set(droneSerialNumber, {
                         closestDistanceToNest: distanceToNest,
                         timeOfLastViolation: timeOfLastViolation
@@ -288,8 +286,6 @@ app.get('/', (request,response) =>
     }
     // send data
     response.render('index',{tranferData});
-    // update client activity
-    lastClientRequestTime = currentTimeStamp;
 
     console.log("Add pilots:", tranferData.pilots)
 });
@@ -333,8 +329,6 @@ app.post('/api', (request, response) =>
         timeStamp: currentTimeStamp,
         TimeStampTimeOut: TimeStampTimeOut
     });
-    // update client activity
-    lastClientRequestTime = currentTimeStamp;
 
     console.log("Pilots to be removed (" + timeStampedPilots.size + 
         ")[" + timeStampedOldPilots.size + 
