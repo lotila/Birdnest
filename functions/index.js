@@ -53,6 +53,9 @@ const TIME_STAMP_TIME_OUT = 2*60*1000;
 // current time stamp is updated when pilots are added or removed
 var currentTimeStamp = new Date().getTime() - TIME_STAMP_TIME_OUT;
 
+// time stamp of previous drone fetch
+var previousFetchTimeStamp;
+
 // activePilots stores pilot data
 // key = drone serial number
 // data = {
@@ -109,10 +112,16 @@ function fetchDrones()
             parseString(xmlFile, function (parserError, result) {
                 dronesInJsonFile = result;
             });
-            // get list of drones
-            const droneList = dronesInJsonFile.report.capture[0].drone;
             // get time 
             const timeOfLastViolation = dronesInJsonFile.report.capture[0]['$'].snapshotTimestamp;
+
+            // check if it is a new update
+            if( new Date(previousFetchTimeStamp).getTime() === new Date(timeOfLastViolation).getTime()) { return; }
+            previousFetchTimeStamp = timeOfLastViolation;
+
+            // get list of drones
+            const droneList = dronesInJsonFile.report.capture[0].drone;
+
             var droneSerialNumber;
             var distanceToNest;
             droneList.forEach( (newDrone) => 
@@ -158,6 +167,7 @@ function fetchDrones()
                             timeOfLastViolation: timeOfLastViolation
                         });
                     }
+                    console.log("update drone:", droneSerialNumber);
                 }
                 else {
                     // add to promisedPilots
@@ -168,6 +178,8 @@ function fetchDrones()
                         closestDistanceToNest: distanceToNest,
                         timeOfLastViolation: timeOfLastViolation
                     });
+
+                    console.log("add drone:", droneSerialNumber);
                 }
             });
         // if error, fetch drones in next interval
@@ -216,8 +228,6 @@ function fetchPilot(droneSerialNumber)
                 closestDistanceToNest: oldActivePilots.closestDistanceToNest,
                 timeOfLastViolation: oldActivePilots.timeOfLastViolation
             });
-            console.log("add drone:", droneSerialNumber);
-
         }).catch((error) => handlePilotError(droneSerialNumber, error) );
     }).catch((error) => handlePilotError(droneSerialNumber, error) );
 }
